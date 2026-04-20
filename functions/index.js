@@ -13,8 +13,10 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 
-// Initialize Firebase Admin
-admin.initializeApp();
+// Initialize Firebase Admin (only if not already initialized)
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected
@@ -188,3 +190,252 @@ function _hashId(data) {
   const str = `${data.name}|${data.size}|${data.lastModified}`;
   return crypto.createHash('sha256').update(str).digest('hex');
 }
+
+// POST /dart/bulk-publish - Publish multiple files at once from external websites
+exports.bulkPublish = onRequest({ cors: true }, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+  await verifyAuth(req, res, async () => {
+    const {files} = req.body;
+    if (!Array.isArray(files) || files.length === 0) {
+      res.status(400).json({ error: 'Invalid request: files must be a non-empty array' });
+      return;
+    }
+
+    const {getFirestore} = require("firebase-admin/firestore");
+    const db = getFirestore();
+    const uid = req.user.uid;
+    const user = req.user;
+
+    if (!user.email) {
+      res.status(403).json({ error: 'Forbidden: User must have an email address to publish' });
+      return;
+    }
+
+    try {
+      const results = await Promise.all(files.map(async (file) => {
+        const fileId = await _hashId({name: file.name, size: file.size || 0, lastModified: Date.now()});
+        await db.collection('public_files').doc(fileId).set({
+          ownerUid: uid,
+          ownerEmail: user.email || '',
+          ownerName: user.displayName || user.email || '',
+          fileName: file.name,
+          filePath: file.filePath,
+          downloadURL: file.downloadURL,
+          fileSize: file.size || 0,
+          canEdit: true, // Owner can edit by default
+          sharedWith: [],
+          ts: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        return { fileId, name: file.name, success: true };
+      }));
+
+      res.json({ success: true, results });
+    } catch (error) {
+      logger.error('Bulk publish error:', error);
+      res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+  });
+});
+
+// POST /dart/receive-files - Receive files from external websites to user's locker
+exports.receiveFiles = onRequest({ cors: true }, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+  await verifyAuth(req, res, async () => {
+    const {files} = req.body;
+    if (!Array.isArray(files) || files.length === 0) {
+      res.status(400).json({ error: 'Invalid request: files must be a non-empty array' });
+      return;
+    }
+
+    const {getFirestore} = require("firebase-admin/firestore");
+    const db = getFirestore();
+    const uid = req.user.uid;
+    const user = req.user;
+
+    try {
+      const results = await Promise.all(files.map(async (file) => {
+        const fileId = await _hashId({name: file.name, size: file.size || 0, lastModified: Date.now()});
+        await db.collection('transfers').doc(uid).collection('files').doc(fileId).set({
+          name: file.name,
+          size: file.size || 0,
+          filePath: file.filePath,
+          downloadURL: file.downloadURL,
+          folder: file.folder || '',
+          status: 'complete',
+          canEdit: true,
+          sharedWith: [],
+          ts: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        await db.collection('dedup').doc(fileId).set({
+          downloadURL: file.downloadURL,
+          filePath: file.filePath,
+          uid: uid,
+          ts: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        return { fileId, name: file.name, success: true };
+      }));
+
+      res.json({ success: true, results });
+    } catch (error) {
+      logger.error('Receive files error:', error);
+      res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+  });
+});
+
+// PUT /dart/update-file - Update a published file (owner only)
+exports.updateFile = onRequest({ cors: true }, async (req, res) => {
+  if (req.method !== 'PUT') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+  await verifyAuth(req, res, async () => {
+    const {fileId, name, downloadURL, filePath, fileSize} = req.body;
+    if (!fileId || !downloadURL || !filePath) {
+      res.status(400).json({ error: 'Missing required fields: fileId, downloadURL, filePath' });
+      return;
+    }
+
+    const {getFirestore} = require("firebase-admin/firestore");
+    const db = getFirestore();
+    const uid = req.user.uid;
+    const user = req.user;
+
+    try {
+      // Check if user is the owner
+      const fileDoc = await db.collection('public_files').doc(fileId).get();
+      if (!fileDoc.exists) {
+        res.status(404).json({ error: 'File not found' });
+        return;
+      }
+
+      const fileData = fileDoc.data();
+      if (fileData.ownerUid !== uid) {
+        res.status(403).json({ error: 'Forbidden: Only the owner can edit this file' });
+        return;
+      }
+
+      // Update the file
+      await db.collection('public_files').doc(fileId).update({
+        fileName: name || fileData.fileName,
+        downloadURL: downloadURL,
+        filePath: filePath,
+        fileSize: fileSize || fileData.fileSize,
+        ts: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('Update file error:', error);
+      res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+  });
+});
+
+// POST /dart/share-file - Share a file with other users for collaborative editing
+exports.shareFile = onRequest({ cors: true }, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+  await verifyAuth(req, res, async () => {
+    const {fileId, shareWithEmails} = req.body;
+    if (!fileId || !Array.isArray(shareWithEmails)) {
+      res.status(400).json({ error: 'Missing required fields: fileId, shareWithEmails' });
+      return;
+    }
+
+    const {getFirestore} = require("firebase-admin/firestore");
+    const db = getFirestore();
+    const uid = req.user.uid;
+    const user = req.user;
+
+    try {
+      // Check if user is the owner
+      const fileDoc = await db.collection('public_files').doc(fileId).get();
+      if (!fileDoc.exists) {
+        res.status(404).json({ error: 'File not found' });
+        return;
+      }
+
+      const fileData = fileDoc.data();
+      if (fileData.ownerUid !== uid) {
+        res.status(403).json({ error: 'Forbidden: Only the owner can share this file' });
+        return;
+      }
+
+      // Add shared users
+      const sharedWith = fileData.sharedWith || [];
+      shareWithEmails.forEach(email => {
+        if (!sharedWith.includes(email)) {
+          sharedWith.push(email);
+        }
+      });
+
+      await db.collection('public_files').doc(fileId).update({
+        sharedWith: sharedWith,
+        ts: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      res.json({ success: true, sharedWith });
+    } catch (error) {
+      logger.error('Share file error:', error);
+      res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+  });
+});
+
+// POST /dart/unshare-file - Unshare a file from specific users
+exports.unshareFile = onRequest({ cors: true }, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+  await verifyAuth(req, res, async () => {
+    const {fileId, unshareEmails} = req.body;
+    if (!fileId || !Array.isArray(unshareEmails)) {
+      res.status(400).json({ error: 'Missing required fields: fileId, unshareEmails' });
+      return;
+    }
+
+    const {getFirestore} = require("firebase-admin/firestore");
+    const db = getFirestore();
+    const uid = req.user.uid;
+
+    try {
+      // Check if user is the owner
+      const fileDoc = await db.collection('public_files').doc(fileId).get();
+      if (!fileDoc.exists) {
+        res.status(404).json({ error: 'File not found' });
+        return;
+      }
+
+      const fileData = fileDoc.data();
+      if (fileData.ownerUid !== uid) {
+        res.status(403).json({ error: 'Forbidden: Only the owner can unshare this file' });
+        return;
+      }
+
+      // Remove shared users
+      const sharedWith = (fileData.sharedWith || []).filter(email => !unshareEmails.includes(email));
+
+      await db.collection('public_files').doc(fileId).update({
+        sharedWith: sharedWith,
+        ts: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      res.json({ success: true, sharedWith });
+    } catch (error) {
+      logger.error('Unshare file error:', error);
+      res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+  });
+});

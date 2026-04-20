@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms of Service - DART</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#040406;--sf:#0b0b12;--sf2:#0f0f18;--sf3:#13131f;
+  --b:#171726;--b2:#1e1e30;--b3:#252540;
+  --d:#00ffc8;--d2:#6c47ff;--d3:#ff3f7f;--d4:#ffb800;--d5:#00b4ff;--d6:#a855f7;--d7:#22d3ee;
+  --tx:#eeeef5;--mu:#55556a;--dm:#252540;
+}
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:'DM Mono',monospace;overflow-x:hidden}
+.wrap{max-width:900px;margin:0 auto;padding:40px 20px 80px}
+
+/* ── Header ── */
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:32px;flex-wrap:wrap}
+.logo-word{font-family:'Syne',sans-serif;font-size:2.2rem;font-weight:900;letter-spacing:-4px;line-height:1;
+  background:linear-gradient(135deg,var(--d) 0%,var(--d2) 40%,var(--d3) 70%,var(--d6) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-sub{font-size:.42rem;letter-spacing:5px;color:var(--mu);text-transform:uppercase;margin-top:2px}
+.btn{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;
+  padding:8px 16px;border:1px solid;cursor:pointer;transition:all .12s;background:transparent;color:inherit;text-decoration:none}
+.btn-n{border-color:var(--dm);color:var(--mu)}.btn-n:hover:not(:disabled){border-color:var(--d);color:var(--d)}
+
+/* ── Content ── */
+.tos-title{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;letter-spacing:-2px;
+  color:var(--d);margin-bottom:8px;line-height:1.2}
+.tos-updated{font-size:.46rem;color:var(--mu);margin-bottom:32px}
+.tos-section{margin-bottom:32px}
+.tos-h{font-size:.7rem;font-weight:700;letter-spacing:2px;color:var(--d2);margin-bottom:12px;text-transform:uppercase}
+.tos-p{font-size:.5rem;line-height:1.8;color:var(--tx);margin-bottom:12px}
+.tos-p a{color:var(--d5);text-decoration:none}.tos-p a:hover{text-decoration:underline}
+.tos-list{list-style:none;padding-left:0;margin-bottom:12px}
+.tos-li{font-size:.5rem;line-height:1.7;color:var(--tx);margin-bottom:8px;padding-left:20px;position:relative}
+.tos-li::before{content:'▪';position:absolute;left:0;color:var(--d2)}
+.tos-warning{background:rgba(255,63,127,.06);border:1px solid var(--d3);padding:16px;margin-bottom:20px}
+.tos-warning-title{font-size:.54rem;font-weight:700;color:var(--d3);margin-bottom:8px}
+.tos-warning-text{font-size:.48rem;line-height:1.7;color:var(--tx)}
+
+/* ── Responsive ── */
+@media(max-width:700px){
+  .hdr{flex-direction:column;align-items:flex-start}
+  .btn{width:100%;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <!-- ── Header ──────────────────────────────────────────────────────────────── -->
+  <header class="hdr">
+    <div>
+      <div class="logo-word">DART</div>
+      <div class="logo-sub">Your Personal File Locker</div>
+    </div>
+    <a href="index.html" class="btn btn-n">← Back to App</a>
+  </header>
+
+  <!-- ── Title ───────────────────────────────────────────────────────────────── -->
+  <div class="tos-title">Terms of Service</div>
+  <div class="tos-updated">Last updated: April 20, 2026</div>
+
+  <!-- ── Agreement to Terms ───────────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">1. Agreement to Terms</div>
+    <p class="tos-p">
+      By accessing or using DART ("the Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, please do not use the Service.
+    </p>
+  </div>
+
+  <!-- ── Description of Service ───────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">2. Description of Service</div>
+    <p class="tos-p">
+      DART is a file storage, sharing, and publishing service that allows users to upload, store, organize, share, and publish files and folders. The Service is provided on an "as is" basis.
+    </p>
+  </div>
+
+  <!-- ── User Responsibilities ─────────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">3. User Responsibilities</div>
+    <p class="tos-p">You agree to:</p>
+    <ul class="tos-list">
+      <li class="tos-li">Use the Service only for lawful purposes</li>
+      <li class="tos-li">Not upload files that violate any applicable laws or regulations</li>
+      <li class="tos-li">Not upload malicious software, viruses, or harmful code</li>
+      <li class="tos-li">Not infringe on the intellectual property rights of others</li>
+      <li class="tos-li">Not attempt to gain unauthorized access to the Service or other users' accounts</li>
+      <li class="tos-li">Maintain the security of your account credentials</li>
+      <li class="tos-li">Be responsible for all activities that occur under your account</li>
+    </ul>
+  </div>
+
+  <!-- ── Disclaimer of Warranties ─────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">4. Disclaimer of Warranties</div>
+    <p class="tos-p">
+      THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+    </p>
+  </div>
+
+  <!-- ── Limitation of Liability ─────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">5. Limitation of Liability</div>
+    
+    <div class="tos-warning">
+      <div class="tos-warning-title">⚠️ IMPORTANT LIABILITY DISCLAIMER</div>
+      <div class="tos-warning-text">
+        <strong>DART IS NOT RESPONSIBLE FOR ANY DAMAGE TO YOUR FILE OR FOLDER.</strong> You acknowledge and agree that:
+        <ul class="tos-list" style="margin-top:8px">
+          <li class="tos-li">Files are stored on third-party cloud infrastructure (Google Cloud Storage) and we cannot guarantee 100% data integrity or availability</li>
+          <li class="tos-li">We are not liable for any loss, corruption, damage, or deletion of your files, whether caused by technical failures, errors, omissions, interruptions, or other causes</li>
+          <li class="tos-li">We are not responsible for any data loss resulting from user error, accidental deletion, account compromise, or any other user action</li>
+          <li class="tos-li">We strongly recommend maintaining your own backups of important files</li>
+          <li class="tos-li">Our maximum liability to you for any claims relating to the Service shall not exceed the amount you paid (if any) for using the Service in the twelve months preceding the claim</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="tos-p">
+      IN NO EVENT SHALL DART, ITS AFFILIATES, EMPLOYEES, AGENTS, OR SERVICE PROVIDERS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION, LOSS OF PROFITS, DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM:
+    </p>
+    <ul class="tos-list">
+      <li class="tos-li">Your access to or use of or inability to access or use the Service</li>
+      <li class="tos-li">Any conduct or content of any third party on the Service</li>
+      <li class="tos-li">Any content obtained from the Service</li>
+      <li class="tos-li">Unauthorized access, use, or alteration of your transmissions or content</li>
+    </ul>
+  </div>
+
+  <!-- ── Data Loss and Backup ─────────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">6. Data Loss and Backup</div>
+    <p class="tos-p">
+      While we strive to maintain data integrity and availability, we cannot guarantee that your files will never be lost, damaged, or corrupted. <strong>YOU ARE SOLELY RESPONSIBLE FOR MAINTAINING BACKUPS OF YOUR IMPORTANT FILES.</strong> We recommend regularly downloading and backing up files stored on the Service to your own storage devices or other backup solutions.
+    </p>
+  </div>
+
+  <!-- ── Intellectual Property ───────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">7. Intellectual Property</div>
+    <p class="tos-p">
+      You retain ownership of all files and content you upload to the Service. By uploading content, you grant us a license to store, process, and display your content solely for the purpose of providing the Service. You represent and warrant that you have the right to upload such content and that it does not infringe on the rights of any third party.
+    </p>
+  </div>
+
+  <!-- ── Privacy ─────────────────────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">8. Privacy</div>
+    <p class="tos-p">
+      Your use of the Service is also governed by our Privacy Policy, which describes how we collect, use, and protect your information. Please review our Privacy Policy available at <a href="privacy.html">privacy.html</a>.
+    </p>
+  </div>
+
+  <!-- ── Termination ───────────────────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">9. Termination</div>
+    <p class="tos-p">
+      We reserve the right to suspend or terminate your access to the Service at any time, with or without cause, with or without notice. Upon termination, your right to use the Service will immediately cease. We may also delete your account and all associated data, subject to applicable law.
+    </p>
+  </div>
+
+  <!-- ── Governing Law ───────────────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">10. Governing Law</div>
+    <p class="tos-p">
+      These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which DART operates, without regard to its conflict of law provisions.
+    </p>
+  </div>
+
+  <!-- ── Changes to Terms ────────────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">11. Changes to Terms</div>
+    <p class="tos-p">
+      We reserve the right to modify these Terms at any time. We will notify users of material changes by posting the updated Terms on this page and updating the "Last updated" date. Your continued use of the Service after such modifications constitutes your acceptance of the revised Terms.
+    </p>
+  </div>
+
+  <!-- ── Contact Information ─────────────────────────────────────────────────── -->
+  <div class="tos-section">
+    <div class="tos-h">12. Contact Information</div>
+    <p class="tos-p">
+      If you have questions about these Terms, please contact us through the DART application.
+    </p>
+  </div>
+
+</div>
+
+</body>
+</html>

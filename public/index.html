@@ -574,6 +574,8 @@ async function _hashId(file) {
     </div>
     <button class="btn btn-n btn-sm" id="authBtn" onclick="FB.signInGoogle()">Sign In</button>
     <button class="btn btn-n btn-sm" onclick="FB?.signOut?.()" style="display:none" id="signOutBtn">Sign Out</button>
+    <a href="privacy.html" class="btn btn-n btn-sm" style="text-decoration:none">Privacy</a>
+    <a href="terms.html" class="btn btn-n btn-sm" style="text-decoration:none">Terms</a>
   </div>
 </header>
 
@@ -773,9 +775,20 @@ async function _hashId(file) {
     <div style="margin-bottom:10px">
       <select class="csel" id="sdkMeth" onchange="renderSDK()">
         <option value="upload">upload()</option><option value="uploadMultiple">uploadMultiple()</option>
-        <option value="onProgress">onProgress()</option><option value="onComplete">onComplete()</option>
-        <option value="history">listenHistory()</option><option value="delete">delete()</option>
+        <option value="onProgress">onProgress()</option>
+        <option value="onComplete">onComplete()</option>
+        <option value="history">listenHistory()</option>
+        <option value="delete">delete()</option>
         <option value="init">Full init</option>
+        <option value="selectFilesForSync">selectFilesForSync()</option>
+        <option value="startAutoSync">startAutoSync()</option>
+        <option value="enableBidirectionalSync">enableBidirectionalSync()</option>
+        <option value="saveToDisk">saveToDisk()</option>
+        <option value="bulkPublishExternal">bulkPublishExternal()</option>
+        <option value="receiveFilesExternal">receiveFilesExternal()</option>
+        <option value="updatePublishedFile">updatePublishedFile()</option>
+        <option value="shareFile">shareFile()</option>
+        <option value="unshareFile">unshareFile()</option>
       </select>
     </div>
     <div class="int-code-wrap">
@@ -796,14 +809,31 @@ async function _hashId(file) {
   <div class="modal">
     <div class="modal-title">⟁ Share file</div>
     <div class="modal-file" id="shareModalName"></div>
-    <div class="modal-label">Recipient email</div>
+    <div class="modal-label">Recipient email (for collaborative editing)</div>
     <input class="modal-input" id="shareEmail" type="email" placeholder="friend@example.com" onkeydown="if(event.key==='Enter')doShare()">
-    <div class="modal-hint">They'll see this in their "Shared with me" tab instantly.</div>
+    <div class="modal-hint">Shared users can edit this file until you unshare it.</div>
     <div class="modal-err" id="shareErr"></div>
-    <div id="existingShares"></div>
+    <div class="modal-label" style="margin-top:12px">Shared with:</div>
+    <div id="existingShares" style="margin-bottom:12px"></div>
     <div class="modal-row">
       <button class="btn btn-n btn-sm" onclick="closeModal('shareModal')">Cancel</button>
       <button class="btn btn-s btn-sm" id="shareBtn" onclick="doShare()">Share</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit published file modal -->
+<div class="modal-bg" id="editPublishedModal" onclick="if(event.target===this)closeModal('editPublishedModal')">
+  <div class="modal">
+    <div class="modal-title">✎ Edit published file</div>
+    <div class="modal-file" id="editPublishedModalName"></div>
+    <div class="modal-label">Upload new version</div>
+    <input type="file" id="editPublishedFile" class="modal-input" onchange="previewEditFile()">
+    <div id="editPreview" style="margin-bottom:10px"></div>
+    <div class="modal-err" id="editPublishedErr"></div>
+    <div class="modal-row">
+      <button class="btn btn-n btn-sm" onclick="closeModal('editPublishedModal')">Cancel</button>
+      <button class="btn btn-s btn-sm" id="editPublishedBtn" onclick="doEditPublished()" disabled>Update</button>
     </div>
   </div>
 </div>
@@ -1169,6 +1199,7 @@ function renderLockerGrid() {
         <button class="lk-btn star" onclick="toggleStar('${fid}')">${f.isStarred?'★':'☆'}</button>
         <button class="lk-btn" onclick="openRenameModal('${fid}')" title="Rename">✎</button>
         <button class="lk-btn sh" onclick="openShareModal('${fid}')">⟁</button>
+        ${f.isPublic?`<button class="lk-btn" style="border-color:var(--d7);color:var(--d7)" onclick="openCollaborativeShare('${fid}')" title="Share for editing">👥</button>`:''}
         <button class="lk-btn" onclick="openCommentsModal('${fid}')">💬</button>
         ${f.isPublic
           ?`<button class="lk-btn unpub" onclick="togglePublic('${fid}',false)">⊘</button>`
@@ -1617,6 +1648,224 @@ async function doShare() {
   } catch(e){ errEl.textContent='Share failed: '+e.message; btn.textContent='Share'; btn.disabled=false; }
 }
 
+// ── Collaborative Editing (New) ──────────────────────────────────────────────────
+let _currentShareFileId = null;
+
+async function openCollaborativeShare(fileId) {
+  _currentShareFileId = fileId;
+  const f = _lockerFiles.find(x=>x.id===fileId) || _pubFiles.find(x=>x.id===fileId);
+  if (!f) return;
+  
+  document.getElementById('shareModalName').textContent = f.name || 'Unnamed file';
+  document.getElementById('shareEmail').value = '';
+  document.getElementById('shareErr').textContent = '';
+  document.getElementById('existingShares').innerHTML = '<div style="font-size:.44rem;color:var(--mu)">Loading...</div>';
+  openModal('shareModal');
+  
+  // Load existing shared users for this file
+  loadCollaborativeShares(fileId);
+  setTimeout(()=>document.getElementById('shareEmail')?.focus(),80);
+}
+
+async function loadCollaborativeShares(fileId) {
+  const user = window._fbUser;
+  if (!user) return;
+  
+  try {
+    const {db,doc,getDoc} = window._dartFS;
+    const snap = await getDoc(doc(db, 'public_files', fileId));
+    const existingSharesEl = document.getElementById('existingShares');
+    
+    if (snap.exists()) {
+      const data = snap.data();
+      const sharedWith = data.sharedWith || [];
+      
+      if (sharedWith.length === 0) {
+        existingSharesEl.innerHTML = '<div style="font-size:.44rem;color:var(--mu)">No one shared yet</div>';
+      } else {
+        existingSharesEl.innerHTML = sharedWith.map(email => `
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.46rem">
+            <span style="color:var(--tx)">${esc(email)}</span>
+            <button class="lk-btn del" onclick="unshareCollaborative('${fileId}','${escAttr(email)}')" style="font-size:.38rem;padding:1px 5px">Remove</button>
+          </div>
+        `).join('');
+      }
+    } else {
+      existingSharesEl.innerHTML = '<div style="font-size:.44rem;color:var(--mu)">No one shared yet</div>';
+    }
+  } catch(e) {
+    console.error('Failed to load collaborative shares:', e);
+    document.getElementById('existingShares').innerHTML = '<div style="font-size:.44rem;color:var(--d3)">Failed to load shared users</div>';
+  }
+}
+
+async function doCollaborativeShare() {
+  const email = document.getElementById('shareEmail')?.value.trim().toLowerCase();
+  const errEl = document.getElementById('shareErr');
+  const btn = document.getElementById('shareBtn');
+  errEl.textContent = '';
+  
+  if (!email || !email.includes('@')) {
+    errEl.textContent = 'Enter a valid email';
+    return;
+  }
+  
+  if (!_currentShareFileId) {
+    errEl.textContent = 'No file selected';
+    return;
+  }
+  
+  btn.textContent = 'Sharing...';
+  btn.disabled = true;
+  
+  try {
+    // Check if dart SDK is available
+    if (window.dartSDK) {
+      await window.dartSDK.shareFile(_currentShareFileId, [email]);
+      _notify(`Shared with ${email} for collaborative editing`, 's');
+    } else {
+      // Fallback to direct Firestore update
+      const {db,doc,getDoc,updateDoc} = window._dartFS;
+      const snap = await getDoc(doc(db, 'public_files', _currentShareFileId));
+      
+      if (snap.exists()) {
+        const data = snap.data();
+        const sharedWith = data.sharedWith || [];
+        if (!sharedWith.includes(email)) {
+          sharedWith.push(email);
+          await updateDoc(doc(db, 'public_files', _currentShareFileId), { sharedWith });
+          _notify(`Shared with ${email} for collaborative editing`, 's');
+        } else {
+          errEl.textContent = 'Already shared with this user';
+        }
+      } else {
+        errEl.textContent = 'File not found in public files';
+      }
+    }
+    
+    document.getElementById('shareEmail').value = '';
+    btn.textContent = 'Share';
+    btn.disabled = false;
+    loadCollaborativeShares(_currentShareFileId);
+  } catch(e) {
+    errEl.textContent = 'Share failed: ' + e.message;
+    btn.textContent = 'Share';
+    btn.disabled = false;
+  }
+}
+
+async function unshareCollaborative(fileId, email) {
+  try {
+    if (window.dartSDK) {
+      await window.dartSDK.unshareFile(fileId, [email]);
+      _notify(`Removed ${email} from shared users`, 's');
+    } else {
+      const {db,doc,getDoc,updateDoc} = window._dartFS;
+      const snap = await getDoc(doc(db, 'public_files', fileId));
+      
+      if (snap.exists()) {
+        const data = snap.data();
+        const sharedWith = (data.sharedWith || []).filter(e => e !== email);
+        await updateDoc(doc(db, 'public_files', fileId), { sharedWith });
+        _notify(`Removed ${email} from shared users`, 's');
+      }
+    }
+    loadCollaborativeShares(fileId);
+  } catch(e) {
+    _notify('Failed to unshare: ' + e.message, 'e');
+  }
+}
+
+// ── Owner Edit Published File (New) ────────────────────────────────────────────────
+let _currentEditFileId = null;
+let _currentEditFile = null;
+
+async function openEditPublishedModal(fileId) {
+  _currentEditFileId = fileId;
+  const f = _pubFiles.find(x=>x.id===fileId) || _lockerFiles.find(x=>x.id===fileId);
+  if (!f) return;
+  
+  document.getElementById('editPublishedModalName').textContent = f.name || 'Unnamed file';
+  document.getElementById('editPublishedFile').value = '';
+  document.getElementById('editPreview').innerHTML = '';
+  document.getElementById('editPublishedErr').textContent = '';
+  document.getElementById('editPublishedBtn').disabled = true;
+  
+  openModal('editPublishedModal');
+}
+
+function previewEditFile() {
+  const fileInput = document.getElementById('editPublishedFile');
+  const previewEl = document.getElementById('editPreview');
+  const btn = document.getElementById('editPublishedBtn');
+  
+  if (fileInput.files.length > 0) {
+    _currentEditFile = fileInput.files[0];
+    previewEl.innerHTML = `
+      <div style="font-size:.46rem;color:var(--d)">
+        ✓ Selected: ${esc(_currentEditFile.name)} (${fmtBytes(_currentEditFile.size)})
+      </div>
+    `;
+    btn.disabled = false;
+  } else {
+    _currentEditFile = null;
+    previewEl.innerHTML = '';
+    btn.disabled = true;
+  }
+}
+
+async function doEditPublished() {
+  if (!_currentEditFile || !_currentEditFileId) {
+    document.getElementById('editPublishedErr').textContent = 'No file selected';
+    return;
+  }
+  
+  const btn = document.getElementById('editPublishedBtn');
+  const errEl = document.getElementById('editPublishedErr');
+  const user = window._fbUser;
+  
+  if (!user) {
+    errEl.textContent = 'Not signed in';
+    return;
+  }
+  
+  btn.textContent = 'Uploading...';
+  btn.disabled = true;
+  errEl.textContent = '';
+  
+  try {
+    // First upload the new file
+    const uploadResult = await FB.upload(_currentEditFile);
+    
+    // Then update the published file metadata
+    if (window.dartSDK) {
+      await window.dartSDK.updatePublishedFile(_currentEditFileId, {
+        name: uploadResult.name,
+        downloadURL: uploadResult.downloadURL,
+        filePath: uploadResult.filePath,
+        fileSize: uploadResult.size
+      });
+    } else {
+      // Fallback: direct Firestore update
+      const {db,doc,updateDoc} = window._dartFS;
+      await updateDoc(doc(db, 'public_files', _currentEditFileId), {
+        fileName: uploadResult.name,
+        downloadURL: uploadResult.downloadURL,
+        filePath: uploadResult.filePath,
+        fileSize: uploadResult.size
+      });
+    }
+    
+    _notify('File updated successfully', 's');
+    closeModal('editPublishedModal');
+    loadPublicFiles(); // Refresh the public files list
+  } catch(e) {
+    errEl.textContent = 'Update failed: ' + e.message;
+    btn.textContent = 'Update';
+    btn.disabled = false;
+  }
+}
+
 // ── Shared with me ────────────────────────────────────────────────────────────
 let _swmUnsub = null;
 async function loadSharedWithMe() {
@@ -1757,6 +2006,8 @@ function renderPublicGrid() {
         <button class="lk-btn dl" onclick="parallelDownload('${purl}','${pfname}',${f.fileSize||0});FB.logActivity?.('${pfid}','download')">↓ Download</button>
         <button class="lk-btn" onclick="navigator.clipboard.writeText('${purl}').then(()=>_notify('Copied','s'))">⎘</button>
         <button class="lk-btn" onclick="openCommentsModal_pub('${pfid}','${pfname}')">💬</button>
+        ${isOwn?`<button class="lk-btn" style="border-color:var(--d4);color:var(--d4)" onclick="openEditPublishedModal('${pfid}')" title="Edit published file">✎ Edit</button>`:''}
+        ${isOwn?`<button class="lk-btn" style="border-color:var(--d7);color:var(--d7)" onclick="openCollaborativeShare('${pfid}')" title="Share for editing">👥</button>`:''}
         ${isOwn?`<button class="lk-btn unpub" onclick="togglePublic('${pfid}',false)">⊘ Unpublish</button>`:''}
       </div>
     </div>`;
@@ -2959,6 +3210,94 @@ console.log(result.downloadURL);
 
 // Sign out
 await dart.signOut();`,
+
+  selectFilesForSync: `// dart.selectFilesForSync() → Promise<Array<fileHandle>>
+//
+// Select files from local disk for sync using File System Access API.
+// Chrome/Edge/Opera only. Requires user permission.
+
+const fileHandles = await dart.selectFilesForSync();
+console.log('Selected', fileHandles.length, 'files for sync');`,
+
+  startAutoSync: `// dart.startAutoSync(fileHandles, options) → Promise<stopFunction>
+//
+// Start automatic sync from local disk. Watches for file changes.
+// Chrome/Edge/Opera only.
+
+const stopSync = await dart.startAutoSync(fileHandles, {
+  onFileChanged: (fileHandle) => {
+    console.log('File changed:', fileHandle.name);
+    // Automatically upload changed file
+  },
+  interval: 1000,  // Check every 1 second
+});
+
+// Stop syncing
+stopSync();`,
+
+  enableBidirectionalSync: `// dart.enableBidirectionalSync(fileHandles, options) → Promise<stopFunction>
+//
+// Enable bidirectional sync: app edits update local files.
+// Listens to Firestore changes and writes to disk.
+
+const stopBidirectional = await dart.enableBidirectionalSync(fileHandles, {
+  onRemoteChange: (fileHandle, newContent) => {
+    console.log('Remote file updated:', fileHandle.name);
+  },
+});
+
+// Stop bidirectional sync
+stopBidirectional();`,
+
+  saveToDisk: `// dart.saveToDisk(fileHandle, content) → Promise<void>
+//
+// Save content to local file handle.
+// Used by bidirectional sync to update local files.
+
+await dart.saveToDisk(fileHandle, newContent);
+console.log('File saved to disk');`,
+
+  bulkPublishExternal: `// dart.bulkPublishExternal(files) → Promise<{ success, results }>
+//
+// Publish multiple files from external websites.
+// Used by external websites to bulk publish to DART.
+
+const results = await dart.bulkPublishExternal([
+  { name: 'file1.pdf', size: 12345, filePath: 'uploads/uid/file1.pdf', downloadURL: 'https://...' },
+  { name: 'file2.jpg', size: 67890, filePath: 'uploads/uid/file2.jpg', downloadURL: 'https://...' }
+]);`,
+
+  receiveFilesExternal: `// dart.receiveFilesExternal(files) → Promise<{ success, results }>
+//
+// Receive files from external websites to user's locker.
+// Used by external websites to send files to DART users.
+
+const results = await dart.receiveFilesExternal([
+  { name: 'shared.pdf', size: 12345, filePath: 'uploads/uid/shared.pdf', downloadURL: 'https://...' }
+]);`,
+
+  updatePublishedFile: `// dart.updatePublishedFile(fileId, file, options) → Promise<{ success }>
+//
+// Update a published file (owner only).
+// Upload new version and update Firestore metadata.
+
+const result = await dart.updatePublishedFile('file-id-here', newFile, {
+  onProgress: (pct) => console.log(pct + '%'),
+});`,
+
+  shareFile: `// dart.shareFile(fileId, emails) → Promise<{ success, sharedWith }>
+//
+// Share a file with other users for collaborative editing.
+
+const result = await dart.shareFile('file-id-here', ['friend@example.com']);
+console.log('Shared with:', result.sharedWith);`,
+
+  unshareFile: `// dart.unshareFile(fileId, emails) → Promise<{ success, sharedWith }>
+//
+// Unshare a file from specific users.
+
+const result = await dart.unshareFile('file-id-here', ['friend@example.com']);
+console.log('Remaining shared with:', result.sharedWith);`,
 };
 
 // ── REST API docs ────────────────────────────────────────────────────────────
@@ -3111,6 +3450,112 @@ await fetch(url, { method: 'PUT', body: fileBlob });`,
   })
 });
 const { success, fileId, published } = await res.json();`,
+  },
+  {
+    method: 'POST', path: '/dart/bulk-publish', desc: 'Publish multiple files at once from external websites',
+    params: [
+      ['files', 'Array', 'Array of { name, size, filePath, downloadURL }'],
+    ],
+    response: '{ success, results: [{ fileId, name, success }] }',
+    example: `const res = await fetch('/dart/bulk-publish', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + await user.getIdToken()
+  },
+  body: JSON.stringify({
+    files: [
+      { name: 'file1.pdf', size: 12345, filePath: 'uploads/uid/file1.pdf', downloadURL: 'https://...' },
+      { name: 'file2.jpg', size: 67890, filePath: 'uploads/uid/file2.jpg', downloadURL: 'https://...' }
+    ]
+  })
+});
+const { results } = await res.json();`,
+  },
+  {
+    method: 'POST', path: '/dart/receive-files', desc: 'Receive files from external websites to user\'s locker',
+    params: [
+      ['files', 'Array', 'Array of { name, size, filePath, downloadURL, folder }'],
+    ],
+    response: '{ success, results: [{ fileId, name, success }] }',
+    example: `const res = await fetch('/dart/receive-files', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + await user.getIdToken()
+  },
+  body: JSON.stringify({
+    files: [
+      { name: 'shared.pdf', size: 12345, filePath: 'uploads/uid/shared.pdf', downloadURL: 'https://...', folder: '' }
+    ]
+  })
+});
+const { results } = await res.json();`,
+  },
+  {
+    method: 'PUT', path: '/dart/update-file', desc: 'Update a published file (owner only)',
+    params: [
+      ['fileId', 'string', 'File ID to update'],
+      ['name', 'string', 'New filename (optional)'],
+      ['downloadURL', 'string', 'New download URL'],
+      ['filePath', 'string', 'New storage path'],
+      ['fileSize', 'number', 'New file size (optional)'],
+    ],
+    response: '{ success }',
+    example: `const res = await fetch('/dart/update-file', {
+  method: 'PUT',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + await user.getIdToken()
+  },
+  body: JSON.stringify({
+    fileId: 'abc123...',
+    downloadURL: 'https://storage.googleapis.com/...',
+    filePath: 'uploads/uid/updated.pdf',
+    name: 'updated.pdf'
+  })
+});
+const { success } = await res.json();`,
+  },
+  {
+    method: 'POST', path: '/dart/share-file', desc: 'Share a file with other users for collaborative editing',
+    params: [
+      ['fileId', 'string', 'File ID to share'],
+      ['shareWithEmails', 'Array', 'Array of email addresses to share with'],
+    ],
+    response: '{ success, sharedWith: [emails] }',
+    example: `const res = await fetch('/dart/share-file', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + await user.getIdToken()
+  },
+  body: JSON.stringify({
+    fileId: 'abc123...',
+    shareWithEmails: ['friend@example.com', 'colleague@example.com']
+  })
+});
+const { sharedWith } = await res.json();`,
+  },
+  {
+    method: 'POST', path: '/dart/unshare-file', desc: 'Unshare a file from specific users',
+    params: [
+      ['fileId', 'string', 'File ID to unshare'],
+      ['unshareEmails', 'Array', 'Array of email addresses to remove'],
+    ],
+    response: '{ success, sharedWith: [remaining emails] }',
+    example: `const res = await fetch('/dart/unshare-file', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + await user.getIdToken()
+  },
+  body: JSON.stringify({
+    fileId: 'abc123...',
+    unshareEmails: ['friend@example.com']
+  })
+});
+const { sharedWith } = await res.json();`,
   },
 ];
 

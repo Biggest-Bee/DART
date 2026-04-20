@@ -371,6 +371,490 @@ class DartSDK {
     return finalResult;
   }
 
+  /**
+   * Publish multiple files/folders with controlled concurrency.
+   *
+   * @param {FileList|File[]} files
+   * @param {object}   [opts]
+   * @param {boolean}  [opts.publish=true]  If true, publish to public area; if false, add to locker
+   * @param {number}   [opts.concurrency=4]   Max parallel uploads
+   * @param {function} [opts.onFileProgress]  (file, pct, speedMBps) => void
+   * @param {function} [opts.onFileComplete]  (file, result) => void
+   * @param {function} [opts.onAllComplete]   (results[]) => void
+   * @returns {Promise<Array>}
+   */
+  async publishMultiple(files, opts = {}) {
+    const list    = [...files];
+    const limit   = opts.concurrency ?? 4;
+    const publish = opts.publish ?? true;
+    const results = [];
+    let   i = 0;
+    const worker = async () => {
+      while (i < list.length) {
+        const file = list[i++];
+        try {
+          const result = await this.publish(file, {
+            publish: publish,
+            onProgress: (p, s) => opts.onFileProgress?.(file, p, s),
+            onComplete: r      => opts.onFileComplete?.(file, r),
+            onError:    e      => this._onError?.(file, e),
+          });
+          results.push(result);
+        } catch {}
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
+    opts.onAllComplete?.(results);
+    return results;
+  }
+
+  // ─── External Website Integration ──────────────────────────────────────────────
+
+  /**
+   * Bulk publish files from external website (REST API wrapper).
+   * Files should already be uploaded - this only updates metadata.
+   *
+   * @param {Array} files - Array of {name, downloadURL, filePath, size}
+   * @returns {Promise<{success: boolean, results: Array}>}
+   */
+  async bulkPublishExternal(files) {
+    await this._ready;
+    const user = this._user;
+    if (!user) throw new Error('Not signed in — call dart.signIn() first');
+    if (!user.email) throw new Error('User must have an email address to publish');
+
+    const idToken = await user.getIdToken();
+    const projectId = this._config.projectId;
+    const region = 'us-central1';
+    const apiUrl = `https://${region}-${projectId}.cloudfunctions.net/dart/bulk-publish`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      },
+      body: JSON.stringify({ files })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || 'Bulk publish failed');
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Receive files from external website to your locker (REST API wrapper).
+   * Files should already be uploaded - this only adds them to your locker.
+   *
+   * @param {Array} files - Array of {name, downloadURL, filePath, size, folder?}
+   * @returns {Promise<{success: boolean, results: Array}>}
+   */
+  async receiveFilesExternal(files) {
+    await this._ready;
+    const user = this._user;
+    if (!user) throw new Error('Not signed in — call dart.signIn() first');
+
+    const idToken = await user.getIdToken();
+    const projectId = this._config.projectId;
+    const region = 'us-central1';
+    const apiUrl = `https://${region}-${projectId}.cloudfunctions.net/dart/receive-files`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      },
+      body: JSON.stringify({ files })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || 'Receive files failed');
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Update a published file (owner only).
+   *
+   * @param {string} fileId - The file ID to update
+   * @param {object} updates - {name?, downloadURL, filePath, fileSize?}
+   * @returns {Promise<{success: boolean}>}
+   */
+  async updatePublishedFile(fileId, updates) {
+    await this._ready;
+    const user = this._user;
+    if (!user) throw new Error('Not signed in — call dart.signIn() first');
+
+    const idToken = await user.getIdToken();
+    const projectId = this._config.projectId;
+    const region = 'us-central1';
+    const apiUrl = `https://${region}-${projectId}.cloudfunctions.net/dart/update-file`;
+
+    const response = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      },
+      body: JSON.stringify({ fileId, ...updates })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || 'Update file failed');
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Share a file with other users for collaborative editing (owner only).
+   *
+   * @param {string} fileId - The file ID to share
+   * @param {string[]} emails - Array of email addresses to share with
+   * @returns {Promise<{success: boolean, sharedWith: string[]}>}
+   */
+  async shareFile(fileId, emails) {
+    await this._ready;
+    const user = this._user;
+    if (!user) throw new Error('Not signed in — call dart.signIn() first');
+
+    const idToken = await user.getIdToken();
+    const projectId = this._config.projectId;
+    const region = 'us-central1';
+    const apiUrl = `https://${region}-${projectId}.cloudfunctions.net/dart/share-file`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      },
+      body: JSON.stringify({ fileId, shareWithEmails: emails })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || 'Share file failed');
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Unshare a file from specific users (owner only).
+   *
+   * @param {string} fileId - The file ID to unshare
+   * @param {string[]} emails - Array of email addresses to unshare from
+   * @returns {Promise<{success: boolean, sharedWith: string[]}>}
+   */
+  async unshareFile(fileId, emails) {
+    await this._ready;
+    const user = this._user;
+    if (!user) throw new Error('Not signed in — call dart.signIn() first');
+
+    const idToken = await user.getIdToken();
+    const projectId = this._config.projectId;
+    const region = 'us-central1';
+    const apiUrl = `https://${region}-${projectId}.cloudfunctions.net/dart/unshare-file`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      },
+      body: JSON.stringify({ fileId, unshareEmails: emails })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || 'Unshare file failed');
+    }
+
+    return await response.json();
+  }
+
+  // ─── File System Sync ─────────────────────────────────────────────────────────
+
+  /**
+   * Select files/folders from disk for automatic sync.
+   * Uses File System Access API (Chromium browsers only).
+   *
+   * @param {object} [opts]
+   * @param {boolean} [opts.multiple=true] Allow multiple file selection
+   * @param {boolean} [opts.directory=false] Select directory instead of files
+   * @param {function} [opts.onFileChanged] (fileHandle) => void - Called when a synced file changes
+   * @returns {Promise<Array<FileSystemFileHandle>>}
+   */
+  async selectFilesForSync(opts = {}) {
+    const multiple = opts.multiple ?? true;
+    const directory = opts.directory ?? false;
+
+    if (!('showOpenFilePicker' in window) && !('showDirectoryPicker' in window)) {
+      throw new Error('File System Access API not supported in this browser. Please use Chrome, Edge, or Opera.');
+    }
+
+    let handles;
+    if (directory && 'showDirectoryPicker' in window) {
+      const dirHandle = await window.showDirectoryPicker();
+      handles = await this._getFilesFromDirectory(dirHandle);
+    } else if ('showOpenFilePicker' in window) {
+      handles = await window.showOpenFilePicker({
+        multiple: multiple,
+        mode: 'read'
+      });
+    } else {
+      throw new Error('File picker not available');
+    }
+
+    // Store handles and set up watchers
+    this._syncHandles = this._syncHandles || [];
+    this._syncCallbacks = this._syncCallbacks || [];
+
+    handles.forEach(handle => {
+      this._syncHandles.push(handle);
+      if (opts.onFileChanged) {
+        this._watchFile(handle, opts.onFileChanged);
+      }
+    });
+
+    return handles;
+  }
+
+  /**
+   * Watch a file for changes and auto-upload when modified.
+   *
+   * @param {FileSystemFileHandle} fileHandle
+   * @param {function} onChange - Callback when file changes
+   */
+  async _watchFile(fileHandle, onChange) {
+    if (!this._syncWatchers) this._syncWatchers = new Map();
+
+    const watcher = setInterval(async () => {
+      try {
+        const file = await fileHandle.getFile();
+        const fileId = await this._fileId(file);
+        
+        // Check if file has been modified
+        const lastModified = this._syncWatchers.get(fileHandle);
+        if (!lastModified || file.lastModified > lastModified) {
+          this._syncWatchers.set(fileHandle, file.lastModified);
+          onChange({ fileHandle, file, fileId });
+        }
+      } catch (err) {
+        // File might have been deleted or moved
+        clearInterval(watcher);
+      }
+    }, 2000); // Check every 2 seconds
+
+    this._syncWatchers.set(fileHandle, await (await fileHandle.getFile()).lastModified);
+  }
+
+  /**
+   * Get all files from a directory handle recursively.
+   *
+   * @param {FileSystemDirectoryHandle} dirHandle
+   * @returns {Promise<Array<FileSystemFileHandle>>}
+   */
+  async _getFilesFromDirectory(dirHandle) {
+    const files = [];
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file') {
+        files.push(entry);
+      } else if (entry.kind === 'directory') {
+        const subFiles = await this._getFilesFromDirectory(entry);
+        files.push(...subFiles);
+      }
+    }
+    return files;
+  }
+
+  /**
+   * Upload a synced file when it changes.
+   *
+   * @param {FileSystemFileHandle} fileHandle
+   * @param {object} [opts] - Upload options passed to upload()
+   * @returns {Promise<object>}
+   */
+  async uploadSyncedFile(fileHandle, opts = {}) {
+    const file = await fileHandle.getFile();
+    return await this.upload(file, opts);
+  }
+
+  /**
+   * Start automatic sync for all selected files.
+   * When a file changes, it will be automatically uploaded.
+   *
+   * @param {object} [opts] - Upload options
+   * @returns {Promise<void>}
+   */
+  async startAutoSync(opts = {}) {
+    if (!this._syncHandles || this._syncHandles.length === 0) {
+      throw new Error('No files selected for sync. Call selectFilesForSync() first.');
+    }
+
+    this._autoSyncActive = true;
+
+    // Set up watchers that auto-upload on change
+    this._syncHandles.forEach(handle => {
+      this._watchFile(handle, async ({ file, fileId }) => {
+        if (this._autoSyncActive) {
+          try {
+            await this.uploadSyncedFile(handle, opts);
+          } catch (err) {
+            console.error('Auto-sync upload failed:', err);
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Stop automatic sync.
+   */
+  stopAutoSync() {
+    this._autoSyncActive = false;
+    if (this._syncWatchers) {
+      this._syncWatchers.forEach((_, handle) => {
+        // Clear intervals (simplified - in production, track interval IDs)
+      });
+    }
+  }
+
+  /**
+   * Download and save a file to local disk (bidirectional sync).
+   * Requires File System Access API.
+   *
+   * @param {string} downloadURL - URL to download from
+   * @param {string} suggestedName - Suggested filename
+   * @returns {Promise<FileSystemFileHandle>}
+   */
+  async saveToDisk(downloadURL, suggestedName) {
+    if (!('showSaveFilePicker' in window)) {
+      throw new Error('File System Access API not supported in this browser.');
+    }
+
+    // Download the file
+    const response = await fetch(downloadURL);
+    const blob = await response.blob();
+
+    // Show save file picker
+    const fileHandle = await window.showSaveFilePicker({
+      suggestedName: suggestedName,
+      mode: 'readwrite'
+    });
+
+    // Write to disk
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+
+    return fileHandle;
+  }
+
+  /**
+   * Enable bidirectional sync for a file.
+   * When the file is edited in the app, it will automatically update the local copy.
+   *
+   * @param {string} fileId - The file ID to sync
+   * @param {FileSystemFileHandle} fileHandle - The local file handle
+   * @param {object} [opts]
+   * @param {function} [opts.onSync] (direction, data) => void - Callback when sync occurs
+   * @returns {Promise<void>}
+   */
+  async enableBidirectionalSync(fileId, fileHandle, opts = {}) {
+    if (!('showSaveFilePicker' in window)) {
+      throw new Error('File System Access API not supported in this browser.');
+    }
+
+    this._bidirectionalSyncs = this._bidirectionalSyncs || new Map();
+    this._bidirectionalSyncs.set(fileId, { fileHandle, ...opts });
+
+    // Listen for file changes in the app via Firestore
+    const fb = window.__dartFB;
+    const user = this._user;
+    if (!user) throw new Error('Not signed in');
+
+    const q = fb.doc(fb.collection(this._db, 'transfers', user.uid, 'files'), fileId);
+    fb.onSnapshot(q, async (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const syncInfo = this._bidirectionalSyncs.get(fileId);
+        
+        if (syncInfo && data.status === 'complete' && data.downloadURL) {
+          // Download the updated file
+          const response = await fetch(data.downloadURL);
+          const blob = await response.blob();
+
+          // Write to local file
+          try {
+            const writable = await syncInfo.fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            
+            opts.onSync?.('cloud-to-local', { fileId, fileName: data.name });
+          } catch (err) {
+            console.error('Failed to sync to local disk:', err);
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Update a local file when edited in the app.
+   * This is called internally by bidirectional sync.
+   *
+   * @param {string} fileId - The file ID
+   * @param {object} fileData - The file data from Firestore
+   * @returns {Promise<void>}
+   */
+  async _syncToLocal(fileId, fileData) {
+    const syncInfo = this._bidirectionalSyncs?.get(fileId);
+    if (!syncInfo || !fileData.downloadURL) return;
+
+    try {
+      const response = await fetch(fileData.downloadURL);
+      const blob = await response.blob();
+
+      const writable = await syncInfo.fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+    } catch (err) {
+      console.error('Failed to sync to local disk:', err);
+    }
+  }
+
+  /**
+   * Disable bidirectional sync for a file.
+   *
+   * @param {string} fileId - The file ID to stop syncing
+   * @returns {void}
+   */
+  disableBidirectionalSync(fileId) {
+    if (this._bidirectionalSyncs) {
+      this._bidirectionalSyncs.delete(fileId);
+    }
+  }
+
+  /**
+   * Disable all bidirectional syncs.
+   *
+   * @returns {void}
+   */
+  disableAllBidirectionalSyncs() {
+    if (this._bidirectionalSyncs) {
+      this._bidirectionalSyncs.clear();
+    }
+  }
+
   // ─── Global listeners ─────────────────────────────────────────────────────
 
   /** Add a progress listener that fires for ALL uploads */
