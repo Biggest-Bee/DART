@@ -1,0 +1,51 @@
+mutation CreateDemoData @transaction @auth(level: USER, insecureReason: "This is a seed mutation and doesn't expose sensitive information, authenticated access is sufficient") {
+  user1: user_insert(data: {
+    id: "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1",
+    username: "johndoe",
+    email: "john.doe@example.com",
+    passwordHash: "hashedpassword1",
+    createdAt: "2023-01-01T10:00:00Z"
+  })
+  user2: user_insert(data: {
+    id: "b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2",
+    username: "janedoe",
+    email: "jane.doe@example.com",
+    passwordHash: "hashedpassword2",
+    createdAt: "2023-01-02T11:00:00Z",
+    lastLoginAt: "2023-01-10T15:30:00Z"
+  })
+  file1: file_insert(data: {
+    id: "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3",
+    filename: "document.pdf",
+    fileSize: "102400",
+    mimeType: "application/pdf",
+    storagePath: "/users/johndoe/documents/document.pdf",
+    uploadedAt: "2023-01-05T09:00:00Z",
+    uploaderId: "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1",
+    description: "Important project document."
+  })
+  file2: file_insert(data: {
+    id: "d4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4",
+    filename: "image.jpg",
+    fileSize: "51200",
+    mimeType: "image/jpeg",
+    storagePath: "/users/janedoe/images/image.jpg",
+    uploadedAt: "2023-01-06T14:00:00Z",
+    uploaderId: "b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2"
+  })
+  shareLink1: shareLink_insert(data: {
+    id: "e5e5e5e5-e5e5-4e5e-8e5e-e5e5e5e5e5e5",
+    linkToken: "abc123def456",
+    createdAt: "2023-01-07T10:00:00Z",
+    expiresAt: "2023-01-14T10:00:00Z",
+    isActive: true,
+    fileId: "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3"
+  })
+  downloadHistory1: downloadHistory_insert(data: {
+    id: "f6f6f6f6-f6f6-4f6f-8f6f-f6f6f6f6f6f6",
+    downloadedAt: "2023-01-08T12:00:00Z",
+    downloaderId: "b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2",
+    fileId: "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3",
+    shareLinkId: "e5e5e5e5-e5e5-4e5e-8e5e-e5e5e5e5e5e5"
+  })
+}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test SDK Publish</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { padding: 10px 20px; margin: 5px; }
+    #status { margin-top: 20px; padding: 10px; background: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <h1>Test SDK Publish</h1>
+  
+  <input type="file" id="myFile">
+  <button onclick="testPublishLocker()">Upload to Locker</button>
+  <button onclick="testPublishPublic()">Publish Publicly</button>
+  
+  <div id="status">Ready</div>
+
+  <script type="module">
+    // Load SDK as ES module from deployed URL
+    import { DartSDK } from 'https://studio-6794999112-ce5b1.web.app/dart-sdk.js';
+    
+    const dart = new DartSDK({
+      firebaseConfig: {
+        apiKey: "AIzaSyAnG1BcrNRJfo9qlFLpLPXrezLqtEzNddY",
+        authDomain: "studio-6794999112-ce5b1.firebaseapp.com",
+        projectId: "studio-6794999112-ce5b1",
+        storageBucket: "studio-6794999112-ce5b1.firebasestorage.app",
+        messagingSenderId: "997301192954",
+        appId: "1:997301192954:web:35c766411a392b857ce143",
+        databaseURL: "https://studio-6794999112-default-rtdb.firebaseio.com"
+      }
+    });
+
+    window.dart = dart;
+    
+    const statusEl = document.getElementById('status');
+    
+    // Sign in anonymously for testing
+    dart.signInAnonymously().then(() => {
+      statusEl.textContent = 'Signed in anonymously! Select a file and click a button.';
+    }).catch(err => {
+      statusEl.textContent = 'Sign-in failed: ' + err.message;
+    });
+
+    window.testPublishLocker = async () => {
+      const file = document.getElementById('myFile').files[0];
+      if (!file) {
+        statusEl.textContent = 'Please select a file first';
+        return;
+      }
+
+      statusEl.textContent = 'Publishing to locker...';
+
+      try {
+        const result = await dart.publish(file, {
+          publish: false,
+          onProgress: (pct, speed) => {
+            statusEl.textContent = `Publishing to locker: ${Math.round(pct)}% @ ${speed.toFixed(0)} MB/s`;
+          }
+        });
+
+        statusEl.textContent = `✓ Published to locker! File ID: ${result.fileId}`;
+        console.log('Publish to locker result:', result);
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        console.error('Publish to locker failed:', err);
+      }
+    };
+
+    window.testPublishPublic = async () => {
+      const file = document.getElementById('myFile').files[0];
+      if (!file) {
+        statusEl.textContent = 'Please select a file first';
+        return;
+      }
+
+      statusEl.textContent = 'Publishing to public area...';
+
+      try {
+        const result = await dart.publish(file, {
+          publish: true,
+          onProgress: (pct, speed) => {
+            statusEl.textContent = `Publishing to public: ${Math.round(pct)}% @ ${speed.toFixed(0)} MB/s`;
+          }
+        });
+
+        statusEl.textContent = `✓ Published publicly! File ID: ${result.fileId}`;
+        console.log('Publish to public result:', result);
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        console.error('Publish to public failed:', err);
+      }
+    };
+  </script>
+</body>
+</html>

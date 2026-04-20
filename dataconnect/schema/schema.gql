@@ -1,0 +1,33 @@
+type User @table {
+  username: String!
+  email: String!
+  passwordHash: String!
+  createdAt: Timestamp!
+  lastLoginAt: Timestamp
+}
+
+type File @table {
+  filename: String!
+  fileSize: Int64!
+  mimeType: String!
+  storagePath: String!
+  uploadedAt: Timestamp!
+  description: String
+  uploader: User
+}
+
+type ShareLink @table {
+  linkToken: String!
+  createdAt: Timestamp!
+  expiresAt: Timestamp!
+  isActive: Boolean!
+  downloadCount: Int
+  file: File
+}
+
+type DownloadHistory @table {
+  downloadedAt: Timestamp!
+  downloader: User
+  file: File
+  shareLink: ShareLink
+}

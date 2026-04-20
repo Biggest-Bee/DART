@@ -1,0 +1,42 @@
+query GetMyProfile @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  user(key: {id_expr: "auth.uid"}) {
+    id
+    username
+    email
+    createdAt
+    lastLoginAt
+  }
+}
+
+query GetMyFiles @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  files(where: {uploaderId: {eq_expr: "auth.uid"}}) {
+    id
+    filename
+    fileSize
+    mimeType
+    uploadedAt
+    description
+  }
+}
+
+mutation UploadNewFile($filename: String!, $fileSize: Int64!, $mimeType: String!, $storagePath: String!, $description: String) @auth(level: USER) {
+  file_insert(data: {
+    filename: $filename,
+    fileSize: $fileSize,
+    mimeType: $mimeType,
+    storagePath: $storagePath,
+    uploaderId_expr: "auth.uid",
+    uploadedAt_expr: "request.time",
+    description: $description
+  })
+}
+
+mutation CreateShareLink($fileId: UUID!, $expiresAt: Timestamp!, $isActive: Boolean!) @auth(level: USER) {
+  shareLink_insert(data: {
+    fileId: $fileId,
+    createdAt_expr: "request.time",
+    expiresAt: $expiresAt,
+    isActive: $isActive,
+    linkToken_expr: "uuidV4()"
+  })
+}

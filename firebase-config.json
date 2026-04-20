@@ -1,0 +1,14 @@
+ {
+  "version": "2",
+  "projectNumber": "997301192954",
+  "projectId": "studio-6794999112-ce5b1",
+  "appId": "1:997301192954:web:35c766411a392b857ce143",
+  "realtimeDatabaseInstanceUri": "https://studio-6794999112-ce5b1-default-rtdb.firebaseio.com",
+  "realtimeDatabaseUrl": "",
+  "storageBucket": "studio-6794999112-ce5b1.firebasestorage.app", 
+  "locationId": "",
+  "apiKey": "AIzaSyAnG1BcrNRJfo9qlFLpLPXrezLqtEzNddY",
+  "authDomain": "studio-6794999112-ce5b1.firebaseapp.com",        
+  "messagingSenderId": "997301192954",
+  "measurementId": ""
+}

@@ -1,0 +1,95 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── User's own files ─────────────────────────────────────────────────────
+    match /transfers/{uid}/files/{fileId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── User's folders (Firestore-backed, not localStorage) ──────────────────
+    match /transfers/{uid}/folders/{folderId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── Public files — readable by all signed-in users ───────────────────────
+    match /public_files/{fileId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasAll([
+             'ownerUid','ownerEmail','fileName','filePath','downloadURL','fileSize','ts'
+           ])
+        && request.resource.data.fileName is string
+        && request.resource.data.fileName.size() < 512;
+      allow delete: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ── Shared files ─────────────────────────────────────────────────────────
+    match /shares/{shareId} {
+      allow read: if request.auth != null
+        && (resource.data.ownerUid == request.auth.uid
+          || resource.data.recipientEmail == request.auth.token.email);
+      allow list: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasAll([
+             'ownerUid','ownerEmail','recipientEmail',
+             'fileName','filePath','downloadURL','fileSize','ts'
+           ])
+        && request.resource.data.recipientEmail is string
+        && request.resource.data.recipientEmail.size() < 256;
+      allow delete: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ── File comments — any signed-in user can read/write ────────────────────
+    // (fixed path: was 'comments', now 'file_comments')
+    match /file_comments/{fileId}/msgs/{msgId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid','email','text','ts'])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() < 2000;
+      allow delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ── Activity index — owner reads, anyone signed-in writes ────────────────
+    match /activity/{fileId}/log/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid','email','action','ts']);
+    }
+
+    // ── Activity index (flattened for owner queries) ──────────────────────────
+    match /activity_index/{docId} {
+      allow read: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+    }
+
+    // ── Dedup index ───────────────────────────────────────────────────────────
+    match /dedup/{hash} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.data.keys().hasAll(['downloadURL','filePath','uid','ts'])
+        && request.resource.data.filePath is string
+        && request.resource.data.filePath.size() < 512;
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

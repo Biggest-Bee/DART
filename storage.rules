@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── Per-user uploads — owner has full access ─────────────────────────────
+    match /uploads/{uid}/{allPaths=**} {
+
+      // Owner can always read their own files
+      // Recipients with a valid share record can also read
+      allow read: if request.auth != null
+        && (
+          // Owner
+          request.auth.uid == uid
+          // OR: recipient — validated via Firestore share record in the app
+          // Storage rules can't query Firestore, so we use signed URLs for
+          // shared files instead (generated server-side or via Cloud Function).
+          // For simplicity, shared downloads use the signed URL from the
+          // share record in Firestore — no extra Storage rule needed.
+        );
+
+      // Only the owner can write
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size <= 10 * 1024 * 1024 * 1024
+        && (
+             request.resource.contentType.matches('application/.*')
+          || request.resource.contentType.matches('video/.*')
+          || request.resource.contentType.matches('image/.*')
+          || request.resource.contentType.matches('text/.*')
+          || request.resource.contentType.matches('audio/.*')
+        );
+    }
+
+    // Deny everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// NOTE ON SHARING:
+// Shared file downloads work via the signed downloadURL stored in the
+// Firestore share record — Firebase Storage signed URLs bypass Storage rules
+// entirely and are time-limited (7 days by default from upload time).
+// Recipients click the download link directly from their Shared With Me inbox.
+// No Storage rule changes are needed for this to work.

@@ -1,0 +1,20 @@
+{
+  "rules": {
+    "progress": {
+      "$uid": {
+        ".read":  "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "presence": {
+      "$uid": {
+        ".read":  "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "$other": {
+      ".read":  false,
+      ".write": false
+    }
+  }
+}

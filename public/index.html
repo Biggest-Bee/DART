@@ -1,0 +1,3212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DART — Your File Locker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#040406;--sf:#0b0b12;--sf2:#0f0f18;--sf3:#13131f;
+  --b:#171726;--b2:#1e1e30;--b3:#252540;
+  --d:#00ffc8;--d2:#6c47ff;--d3:#ff3f7f;--d4:#ffb800;--d5:#00b4ff;--d6:#a855f7;--d7:#22d3ee;
+  --tx:#eeeef5;--mu:#55556a;--dm:#252540;
+}
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:'DM Mono',monospace;overflow-x:hidden}
+.wrap{max-width:1200px;margin:0 auto;padding:24px 20px 80px}
+
+/* ── Login gate ── */
+#loginGate{position:fixed;inset:0;background:var(--bg);z-index:900;display:flex;
+  align-items:center;justify-content:center;flex-direction:column;gap:0}
+#loginGate.hidden{display:none}
+.gate-logo{font-family:'Syne',sans-serif;font-size:5rem;font-weight:900;letter-spacing:-8px;
+  background:linear-gradient(135deg,var(--d) 0%,var(--d2) 40%,var(--d3) 70%,var(--d6) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1}
+.gate-sub{font-size:.46rem;letter-spacing:5px;color:var(--mu);text-transform:uppercase;margin-bottom:48px;margin-top:6px}
+.gate-tagline{font-size:.62rem;color:var(--mu);margin-bottom:40px;text-align:center;line-height:1.9}
+.gate-tagline span{color:var(--tx)}
+.gate-btns{display:flex;flex-direction:column;gap:10px;width:260px}
+.gate-btn{font-family:'DM Mono',monospace;font-size:.54rem;letter-spacing:2px;text-transform:uppercase;
+  padding:12px 24px;border:1px solid;cursor:pointer;background:transparent;transition:all .15s;width:100%;text-align:center}
+.gate-btn.primary{border-color:var(--d);color:var(--d)}.gate-btn.primary:hover{background:rgba(0,255,200,.08)}
+.gate-notice{font-size:.44rem;color:var(--mu);margin-top:20px;text-align:center;max-width:280px;line-height:1.6}
+
+/* ── Header ── */
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.logo-word{font-family:'Syne',sans-serif;font-size:2.2rem;font-weight:900;letter-spacing:-4px;line-height:1;
+  background:linear-gradient(135deg,var(--d) 0%,var(--d2) 40%,var(--d3) 70%,var(--d6) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-sub{font-size:.42rem;letter-spacing:5px;color:var(--mu);text-transform:uppercase;margin-top:2px}
+.auth-area{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.user-chip{display:flex;align-items:center;gap:8px;background:var(--sf);border:1px solid var(--b2);padding:5px 12px}
+.user-chip-av{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--d2),var(--d));
+  display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:#fff;flex-shrink:0}
+.user-chip-name{font-size:.48rem;color:var(--tx);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fb-dot{width:7px;height:7px;border-radius:50%;background:var(--dm);flex-shrink:0;transition:background .3s}
+.fb-dot.on{background:var(--d);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Buttons ── */
+.btn{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;
+  padding:8px 16px;border:1px solid;cursor:pointer;transition:all .12s;background:transparent;color:inherit}
+.btn:disabled{opacity:.3;cursor:not-allowed}
+.btn-p{border-color:var(--d);color:var(--d)}.btn-p:hover:not(:disabled){background:rgba(0,255,200,.08)}
+.btn-s{border-color:var(--d2);color:var(--d2)}.btn-s:hover:not(:disabled){background:rgba(108,71,255,.1)}
+.btn-d{border-color:var(--d3);color:var(--d3)}.btn-d:hover:not(:disabled){background:rgba(255,63,127,.08)}
+.btn-n{border-color:var(--dm);color:var(--mu)}.btn-n:hover:not(:disabled){border-color:var(--d);color:var(--d)}
+.btn-sm{font-family:'DM Mono',monospace;font-size:.46rem;letter-spacing:1px;text-transform:uppercase;
+  padding:4px 10px;border:1px solid;cursor:pointer;background:transparent;transition:all .12s}
+
+/* ── Config notice ── */
+.cfg-notice{display:none;background:rgba(255,184,0,.06);border:1px solid var(--d4);padding:12px 16px;
+  margin-bottom:14px;font-size:.5rem;gap:12px;align-items:flex-start;line-height:1.6}
+.cfg-notice.show{display:flex}
+.cfg-notice a{color:var(--d4)}
+
+/* ── Firebase badges ── */
+.auth-bar{background:var(--sf);border:1px solid var(--b);padding:7px 14px;margin-bottom:12px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.badge-sm{font-size:.42rem;border:1px solid var(--b2);padding:2px 6px;color:var(--mu);transition:all .2s}
+.badge-sm.ok{border-color:var(--d);color:var(--d)}
+
+/* ── Status banner ── */
+.bn{font-size:.5rem;padding:8px 14px;margin-bottom:12px;border:1px solid;letter-spacing:1px}
+.bn.idle{border-color:var(--dm);color:var(--mu)}
+.bn.run{border-color:var(--d2);color:var(--d2)}
+.bn.ready{border-color:var(--d);color:var(--d)}
+.bn.err{border-color:var(--d3);color:var(--d3)}
+
+/* ── Metrics ── */
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px}
+.mc{background:var(--sf);border:1px solid var(--b);padding:10px;text-align:center}
+.mv{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:var(--d);line-height:1}
+.ml{font-size:.4rem;color:var(--mu);letter-spacing:2px;text-transform:uppercase;margin-top:4px}
+.bw-bar{height:2px;background:var(--b);margin-bottom:14px}
+.bw-fill{height:100%;background:linear-gradient(90deg,var(--d2),var(--d));width:0%;transition:width .1s}
+
+/* ── Drop zone ── */
+.dz{border:1px dashed var(--b3);padding:32px;text-align:center;margin-bottom:12px;
+  cursor:pointer;transition:all .2s;position:relative}
+.dz:hover,.dz.drag{border-color:var(--d);background:rgba(0,255,200,.03)}
+.dz-icon{font-size:2rem;margin-bottom:8px;color:var(--dm)}
+.dz-txt{font-size:.58rem;color:var(--mu);margin-bottom:4px}
+.dz-sub{font-size:.46rem;color:var(--dm)}
+
+/* ── Controls ── */
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+
+/* ── Queue ── */
+.queue{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;max-height:220px;overflow-y:auto}
+.qi{display:grid;grid-template-columns:28px 1fr 110px 60px;gap:8px;align-items:center;
+  background:var(--sf);border:1px solid var(--b);padding:8px 10px;font-size:.5rem}
+.qi.done{border-color:rgba(0,255,200,.2);background:rgba(0,255,200,.02)}
+.qi.error{border-color:rgba(255,63,127,.2)}
+.qi-num{color:var(--mu);text-align:right;font-size:.44rem}
+.qi-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qi-bar{height:2px;background:var(--b);overflow:hidden;position:relative}
+.qi-fill{height:100%;background:linear-gradient(90deg,var(--d2),var(--d));transition:width .1s}
+.qi-pct{font-size:.44rem;text-align:right}
+.qi-spd{font-size:.42rem;color:var(--mu);text-align:right}
+.bd{font-size:.4rem;padding:1px 5px;border:1px solid var(--dm);color:var(--mu)}
+.bd.active{border-color:var(--d2);color:var(--d2)}
+.bd.done{border-color:var(--d);color:var(--d)}
+.bd.deduped{border-color:var(--d4);color:var(--d4)}
+.bd.error{border-color:var(--d3);color:var(--d3)}
+
+/* ── Tabs ── */
+.lk-tabs{display:flex;gap:0;border-bottom:1px solid var(--b2);margin-bottom:14px;flex-wrap:wrap}
+.lk-tab{font-size:.44rem;letter-spacing:2px;text-transform:uppercase;padding:7px 14px;
+  border:none;background:transparent;color:var(--mu);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;font-family:'DM Mono',monospace;transition:all .15s}
+.lk-tab:hover{color:var(--tx)}.lk-tab.on{color:var(--d);border-bottom-color:var(--d)}
+.lk-pane{display:none}.lk-pane.on{display:block}
+
+/* ── Locker container ── */
+.locker{display:none;background:var(--sf);border:1px solid var(--b2);padding:16px;margin-bottom:16px}
+.locker.show{display:block}
+.locker-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.locker-title{font-size:.46rem;letter-spacing:3px;text-transform:uppercase;color:var(--d);flex:1;min-width:80px}
+.locker-search{background:var(--bg);border:1px solid var(--b2);color:var(--tx);
+  font-family:'DM Mono',monospace;font-size:.5rem;padding:5px 10px;flex:1;min-width:140px;max-width:220px}
+.locker-search:focus{outline:none;border-color:var(--d)}
+.locker-sort{background:var(--bg);border:1px solid var(--b2);color:var(--mu);
+  font-family:'DM Mono',monospace;font-size:.46rem;padding:4px 8px;cursor:pointer}
+.locker-usage{height:3px;background:var(--b);margin-bottom:10px;overflow:hidden}
+.locker-usage-fill{height:100%;background:linear-gradient(90deg,var(--d2),var(--d));transition:width .4s}
+.locker-usage-lbl{font-size:.42rem;color:var(--mu);margin-bottom:4px;display:flex;justify-content:space-between}
+
+/* ── File grid ── */
+.lk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;max-height:460px;overflow-y:auto}
+.lk-empty{font-size:.52rem;color:var(--mu);padding:32px;text-align:center;grid-column:1/-1}
+.lk-toolbar{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.lk-count{font-size:.44rem;color:var(--mu);margin-left:auto}
+
+/* ── File cards ── */
+.lk-card{background:var(--bg);border:1px solid var(--b2);padding:11px;cursor:default;
+  transition:border-color .15s;position:relative;display:flex;flex-direction:column;gap:5px}
+.lk-card:hover{border-color:var(--d)}
+.lk-card.selected{border-color:var(--d2);background:rgba(108,71,255,.04)}
+.lk-card.is-public{border-color:rgba(0,255,200,.25)}
+.lk-card.is-starred{border-color:rgba(255,184,0,.3)}
+.lk-ext{font-size:.4rem;font-weight:700;letter-spacing:2px;color:var(--mu);
+  background:var(--b2);padding:2px 5px;display:inline-block;margin-bottom:1px}
+.lk-name{font-size:.52rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4;cursor:pointer}
+.lk-name:hover{color:var(--d)}
+.lk-meta{font-size:.42rem;color:var(--mu);display:flex;justify-content:space-between;margin-top:auto}
+.lk-badges{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:2px}
+.lk-badge{font-size:.38rem;padding:1px 4px;border:1px solid;letter-spacing:1px;text-transform:uppercase}
+.lk-badge.pub{border-color:var(--d);color:var(--d)}
+.lk-badge.star{border-color:var(--d4);color:var(--d4)}
+.lk-badge.shared{border-color:var(--d6);color:var(--d6)}
+.lk-actions{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
+.lk-btn{font-size:.42rem;padding:2px 6px;border:1px solid var(--dm);color:var(--mu);
+  background:transparent;cursor:pointer;font-family:'DM Mono',monospace;transition:all .12s;white-space:nowrap}
+.lk-btn:hover{border-color:var(--d);color:var(--d)}
+.lk-btn.dl{border-color:var(--d5);color:var(--d5)}.lk-btn.dl:hover{background:rgba(0,180,255,.08)}
+.lk-btn.sh{border-color:var(--d6);color:var(--d6)}.lk-btn.sh:hover{background:rgba(168,85,247,.1)}
+.lk-btn.pub{border-color:var(--d);color:var(--d)}.lk-btn.pub:hover{background:rgba(0,255,200,.08)}
+.lk-btn.unpub{border-color:var(--mu);color:var(--mu)}.lk-btn.unpub:hover{border-color:var(--d3);color:var(--d3)}
+.lk-btn.del{border-color:var(--d3);color:var(--d3)}.lk-btn.del:hover{background:rgba(255,63,127,.08)}
+.lk-btn.star{border-color:var(--d4);color:var(--d4)}.lk-btn.star:hover{background:rgba(255,184,0,.08)}
+
+/* ── Folder cards ── */
+.folder-card{background:var(--sf2);border:1px solid var(--b2);padding:11px;cursor:pointer;
+  transition:all .15s;display:flex;flex-direction:column;gap:5px}
+.folder-card:hover{border-color:var(--d4);background:rgba(255,184,0,.03)}
+.folder-card.selected{border-color:var(--d2);background:rgba(108,71,255,.04)}
+.folder-icon{font-size:1.4rem;line-height:1;margin-bottom:2px}
+.folder-name{font-size:.52rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.folder-meta{font-size:.42rem;color:var(--mu)}
+.breadcrumb{display:flex;align-items:center;gap:4px;font-size:.46rem;color:var(--mu);margin-bottom:10px;flex-wrap:wrap}
+.breadcrumb span{cursor:pointer;transition:color .12s}.breadcrumb span:hover{color:var(--d)}
+.breadcrumb span.active{color:var(--tx)}
+.breadcrumb-sep{color:var(--dm)}
+
+/* ── User cards (public tab) ── */
+.user-card{background:var(--bg);border:1px solid var(--b2);padding:16px 12px;cursor:pointer;
+  transition:border-color .15s;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center}
+.user-card:hover{border-color:var(--d5)}
+.user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--d2),var(--d));
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;
+  color:#fff;font-family:'Syne',sans-serif;flex-shrink:0}
+.user-card-name{font-size:.52rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
+.user-card-meta{font-size:.42rem;color:var(--mu)}
+.user-card-count{font-size:.46rem;color:var(--d5)}
+.pub-card{background:var(--bg);border:1px solid var(--b2);padding:11px;display:flex;flex-direction:column;gap:5px;transition:border-color .15s}
+.pub-card:hover{border-color:var(--d5)}
+.pub-owner{font-size:.4rem;color:var(--mu)}
+
+/* ── Workspace ── */
+.workspace{background:var(--sf);border:1px solid var(--b2);padding:16px;margin-bottom:16px;display:none}
+.workspace.show{display:block}
+.ws-grid{display:grid;grid-template-columns:220px 1fr;gap:16px;min-height:360px}
+.ws-sidebar{border-right:1px solid var(--b2);padding-right:16px}
+.ws-sidebar-title{font-size:.44rem;letter-spacing:3px;text-transform:uppercase;color:var(--mu);margin-bottom:10px}
+.ws-item{font-size:.48rem;padding:5px 8px;cursor:pointer;border:1px solid transparent;
+  transition:all .12s;display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.ws-item:hover{border-color:var(--b2);background:var(--sf2)}
+.ws-item.in-ws{border-color:var(--d2);color:var(--d2);background:rgba(108,71,255,.04)}
+.ws-canvas{min-height:300px;border:1px dashed var(--b3);padding:12px;position:relative}
+.ws-canvas-empty{font-size:.5rem;color:var(--mu);text-align:center;padding:60px 20px}
+.ws-node{background:var(--bg);border:1px solid var(--b2);padding:8px 10px;margin-bottom:6px;
+  display:flex;align-items:center;gap:8px;font-size:.48rem;cursor:grab}
+.ws-node:hover{border-color:var(--d)}
+.ws-node-icon{color:var(--mu);font-size:.8rem}
+.ws-node-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-node-rm{color:var(--d3);cursor:pointer;font-size:.7rem;padding:0 4px}
+.ws-node-rm:hover{color:var(--d3);background:rgba(255,63,127,.1)}
+
+/* ── RTDB live pane ── */
+.rtdb-row{padding:5px 0;border-bottom:1px solid var(--b)}
+.rtdb-name{font-size:.48rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px}
+.rtdb-bar{height:2px;background:var(--b);overflow:hidden;margin:2px 0}
+.rtdb-fill{height:100%;background:linear-gradient(90deg,var(--d5),var(--d));transition:width .1s}
+.rtdb-meta{font-size:.41rem;color:var(--mu);display:flex;justify-content:space-between}
+
+/* ── Shared with me ── */
+.swm-row{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;
+  padding:6px 0;border-bottom:1px solid var(--b);font-size:.48rem}
+.swm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.swm-from{font-size:.42rem;color:var(--mu)}
+.swm-size{font-size:.42rem;color:var(--mu);white-space:nowrap}
+
+/* ── Modals ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(4,4,6,.88);z-index:800;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-bg.show{display:flex}
+.modal{background:var(--sf);border:1px solid var(--b2);padding:22px 24px;min-width:340px;max-width:500px;width:92%}
+.modal-title{font-size:.54rem;letter-spacing:3px;text-transform:uppercase;color:var(--d);margin-bottom:4px}
+.modal-file{font-size:.5rem;color:var(--mu);margin-bottom:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal-label{font-size:.44rem;letter-spacing:2px;text-transform:uppercase;color:var(--mu);margin-bottom:5px}
+.modal-input{width:100%;background:var(--bg);border:1px solid var(--b2);color:var(--tx);
+  font-family:'DM Mono',monospace;font-size:.52rem;padding:8px 10px;margin-bottom:10px;transition:border-color .15s}
+.modal-input:focus{outline:none;border-color:var(--d)}
+.modal-err{font-size:.46rem;color:var(--d3);margin-bottom:8px;min-height:.9rem}
+.modal-row{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.modal-hint{font-size:.44rem;color:var(--mu);margin-bottom:10px;line-height:1.6}
+
+/* ── Extension chips ── */
+.ext-list{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.ext-chip{font-size:.42rem;padding:2px 7px;border:1px solid var(--dm);color:var(--mu);
+  cursor:pointer;transition:all .12s;font-family:'DM Mono',monospace}
+.ext-chip:hover{border-color:var(--d);color:var(--d)}
+.ext-chip.on{border-color:var(--d);color:var(--d);background:rgba(0,255,200,.06)}
+
+/* ── Move modal ── */
+.move-folder-list{max-height:200px;overflow-y:auto;margin-bottom:10px}
+.move-folder-item{font-size:.5rem;padding:7px 10px;cursor:pointer;border:1px solid transparent;
+  transition:all .12s;display:flex;align-items:center;gap:8px}
+.move-folder-item:hover{border-color:var(--b2);background:var(--sf2)}
+.move-folder-item.selected{border-color:var(--d2);color:var(--d2);background:rgba(108,71,255,.04)}
+
+/* ── Zip modal ── */
+.zip-file-list{max-height:180px;overflow-y:auto;margin-bottom:10px;border:1px solid var(--b2);padding:6px}
+.zip-file-item{font-size:.46rem;padding:3px 6px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--b)}
+.zip-file-item:last-child{border-bottom:none}
+
+/* ── Preview modal ── */
+.preview-modal{max-width:860px;width:95%}
+.preview-inner{margin-top:14px;max-height:60vh;overflow:auto;background:var(--bg);
+  border:1px solid var(--b);padding:0;display:flex;align-items:center;justify-content:center}
+.preview-inner img,.preview-inner video,.preview-inner audio{max-width:100%;max-height:55vh}
+.preview-inner pre{font-size:.5rem;color:var(--tx);padding:16px;width:100%;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+
+/* ── Comments ── */
+.comment-list{max-height:200px;overflow-y:auto;margin-bottom:10px}
+.comment-item{padding:7px 0;border-bottom:1px solid var(--b);font-size:.48rem}
+.comment-author{color:var(--d2);margin-bottom:2px;font-size:.44rem}
+.comment-text{color:var(--tx);line-height:1.6}
+.comment-ts{font-size:.4rem;color:var(--mu);margin-top:2px}
+
+/* ── Activity log ── */
+.activity-item{padding:5px 0;border-bottom:1px solid var(--b);font-size:.46rem;
+  display:flex;justify-content:space-between;gap:8px}
+.activity-who{color:var(--d5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.activity-when{color:var(--mu);white-space:nowrap;font-size:.42rem}
+.activity-action{color:var(--mu);font-size:.42rem}
+
+/* ── Integration panel ── */
+.int-panel{background:var(--sf);border:1px solid var(--b2);padding:16px;margin-bottom:16px}
+.int-tabs{display:flex;gap:0;margin-bottom:12px;border-bottom:1px solid var(--b2)}
+.int-tab{font-size:.44rem;letter-spacing:2px;text-transform:uppercase;padding:6px 13px;
+  border:none;background:transparent;color:var(--mu);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;font-family:'DM Mono',monospace;transition:all .15s}
+.int-tab:hover{color:var(--tx)}.int-tab.on{color:var(--d);border-bottom-color:var(--d)}
+.int-pane{display:none}.int-pane.on{display:block}
+.int-code-wrap{position:relative}
+.int-code{background:var(--bg);border:1px solid var(--b);padding:12px;font-size:.48rem;
+  color:var(--d);font-family:'DM Mono',monospace;white-space:pre;overflow-x:auto;max-height:280px;line-height:1.6}
+.int-copy{font-family:'DM Mono',monospace;font-size:.42rem;position:absolute;top:6px;right:6px;
+  border:1px solid var(--dm);background:var(--bg);color:var(--mu);padding:2px 8px;cursor:pointer}
+.int-copy:hover{border-color:var(--d);color:var(--d)}
+.csel{background:var(--bg);border:1px solid var(--b2);color:var(--mu);
+  font-family:'DM Mono',monospace;font-size:.46rem;padding:4px 8px;cursor:pointer;margin-right:6px}
+.api-ep{border:1px solid var(--b2);margin-bottom:6px}
+.api-ep-hdr{display:flex;align-items:center;gap:10px;padding:7px 11px;cursor:pointer;background:var(--sf2);user-select:none}
+.api-ep-hdr:hover{background:var(--b)}
+.api-method{font-size:.42rem;padding:1px 6px;border:1px solid}.api-method.GET{border-color:var(--d);color:var(--d)}
+.api-method.POST{border-color:var(--d2);color:var(--d2)}.api-method.DELETE{border-color:var(--d3);color:var(--d3)}
+.api-method.PUT{border-color:var(--d5);color:var(--d5)}
+.api-path{font-size:.48rem;color:var(--tx)}.api-desc{font-size:.44rem;color:var(--mu);margin-left:auto}
+.api-body{display:none;padding:10px 12px;background:var(--bg)}.api-body.open{display:block}
+.api-sect{font-size:.42rem;letter-spacing:2px;color:var(--mu);text-transform:uppercase;margin:8px 0 4px}
+.api-field{display:flex;gap:8px;padding:3px 0;font-size:.46rem}
+.api-fn{color:var(--d);min-width:100px}.api-type{color:var(--d4);min-width:60px}.api-fdesc{color:var(--mu)}
+.api-example{font-size:.46rem;color:var(--d5);font-family:'DM Mono',monospace;white-space:pre;
+  overflow-x:auto;padding:8px;background:var(--sf);margin-top:4px}
+
+/* ── Notifications ── */
+#notifs{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:6px;z-index:999;pointer-events:none;max-width:340px}
+.notif{font-size:.5rem;padding:8px 14px;border:1px solid;backdrop-filter:blur(8px);pointer-events:none;animation:fadeIn .2s}
+.notif.s{border-color:var(--d);color:var(--d);background:rgba(0,255,200,.06)}
+.notif.e{border-color:var(--d3);color:var(--d3);background:rgba(255,63,127,.06)}
+.notif.i{border-color:var(--dm);color:var(--mu);background:rgba(23,23,38,.9)}
+.notif.p{border-color:var(--d6);color:var(--d6);background:rgba(168,85,247,.06)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ── Toggle ── */
+.tog{width:28px;height:14px;border-radius:7px;border:1px solid var(--dm);background:var(--b);
+  cursor:pointer;position:relative;transition:all .2s;flex-shrink:0}
+.tog::after{content:'';position:absolute;left:2px;top:2px;width:8px;height:8px;border-radius:50%;
+  background:var(--mu);transition:all .2s}
+.tog.on{border-color:var(--d);background:rgba(0,255,200,.1)}
+.tog.on::after{left:16px;background:var(--d)}
+
+/* ── Responsive ── */
+@media(max-width:700px){
+  .metrics{grid-template-columns:repeat(3,1fr)}
+  .ws-grid{grid-template-columns:1fr}
+  .ws-sidebar{border-right:none;border-bottom:1px solid var(--b2);padding-right:0;padding-bottom:12px}
+}
+</style>
+
+<!-- ═══ FIREBASE SDK ══════════════════════════════════════════════════════════ -->
+<script type="module">
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyAnG1BcrNRJfo9qlFLpLPXrezLqtEzNddY",
+  authDomain:        "studio-6794999112-ce5b1.firebaseapp.com",
+  projectId:         "studio-6794999112-ce5b1",
+  storageBucket:     "studio-6794999112-ce5b1.firebasestorage.app",
+  messagingSenderId: "997301192954",
+  appId:             "1:997301192954:web:35c766411a392b857ce143",
+  databaseURL:       "https://studio-6794999112-ce5b1-default-rtdb.firebaseio.com",
+};
+
+const FB_READY = !FIREBASE_CONFIG.apiKey.startsWith('YOUR_');
+window.FB_READY = FB_READY;
+window.FIREBASE_CONFIG = FIREBASE_CONFIG;
+
+import { initializeApp }                             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, onAuthStateChanged,
+         GoogleAuthProvider, signInWithPopup,
+         signInAnonymously as signInAnon, signOut }      from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getStorage, ref, uploadBytesResumable,
+         getDownloadURL, deleteObject }              from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+import { getFirestore, doc, setDoc, getDoc,
+         updateDoc, deleteDoc, onSnapshot,
+         collection, query, where, orderBy, limit,
+         addDoc, serverTimestamp, getDocs }          from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getDatabase, ref as dbRef, set,
+         update, onValue, off, onDisconnect,
+         serverTimestamp as dbTS }                   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+if (!FB_READY) {
+  window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('cfgNotice')?.classList.add('show');
+  });
+  window.FB = {
+    auth: null, upload: () => Promise.reject('Not configured'),
+    signInGoogle: () => {}, signOut: () => {},
+    delete: () => {}, getUser: () => null,
+  };
+} else {
+  const app  = initializeApp(FIREBASE_CONFIG);
+  const auth = getAuth(app);
+  const stor = getStorage(app);
+  const db   = getFirestore(app);
+  const rtdb = getDatabase(app);
+  const gp   = new GoogleAuthProvider();
+  const DEV  = Math.random().toString(36).slice(2,10);
+
+  onAuthStateChanged(auth, user => {
+    window._fbUser = user;
+    window.dispatchEvent(new CustomEvent('fb-auth', { detail: user }));
+    if (user) { _listenHistory(user.uid); _setPresence(user.uid); }
+  });
+
+  window.FB = {
+    get user() { return window._fbUser; },
+    async signInGoogle() {
+      try { await signInWithPopup(auth, gp); }
+      catch(e) { window._notify?.('Sign-in failed: ' + e.message, 'e'); }
+    },
+    async signInAnonymously() {
+      try { 
+        const secret = prompt('Enter admin secret for anonymous sign-in:');
+        if (secret !== 'xK9') {
+          window._notify?.('Access denied: Invalid secret', 'e');
+          return;
+        }
+        const result = await signInAnon(auth);
+        // Force update immediately since onAuthStateChanged might be slow
+        window._fbUser = result.user;
+        window.dispatchEvent(new CustomEvent('fb-auth', { detail: result.user }));
+        if (result.user) { _listenHistory(result.user.uid); _setPresence(result.user.uid); }
+        return result;
+      }
+      catch(e) { window._notify?.('Sign-in failed: ' + e.message, 'e'); }
+    },
+    async signOut() {
+      try { await signOut(auth); }
+      catch(e) { window._notify?.('Sign-out failed: ' + e.message, 'e'); }
+    },
+
+    async upload(file, opts = {}) {
+      const { onProgress, onComplete, onError } = opts;
+      const user = window._fbUser;
+      if (!user) throw new Error('Not signed in');
+      const uid    = user.uid;
+      const fileId = await _hashId(file);
+      const folder = opts.folderPath || '';
+      const storagePath = folder
+        ? `uploads/${uid}/${folder}/${file.name}`
+        : `uploads/${uid}/${file.name}`;
+      const fsPath = folder
+        ? `transfers/${uid}/folders/${folder.replace(/\//g,'_')}/files/${fileId}`
+        : `transfers/${uid}/files/${fileId}`;
+
+      const dedupSnap = await getDoc(doc(db, 'dedup', fileId)).catch(() => null);
+      if (dedupSnap?.exists()) {
+        const d = dedupSnap.data();
+        const result = { deduped: true, downloadURL: d.downloadURL, filePath: d.filePath, name: file.name, size: file.size };
+        onComplete?.(result); return result;
+      }
+
+      const storRef  = ref(stor, storagePath);
+      const metadata = { contentType: file.type || 'application/octet-stream',
+        customMetadata: { uid, originalName: file.name, size: String(file.size), dartVersion: '6' } };
+      const task = uploadBytesResumable(storRef, file, metadata);
+      const t0   = Date.now();
+
+      await setDoc(doc(db, 'transfers', uid, 'files', fileId), {
+        name: file.name, size: file.size, filePath: storagePath,
+        folder: folder || '', status: 'uploading', ts: serverTimestamp()
+      }, { merge: true });
+
+      return new Promise((resolve, reject) => {
+        task.on('state_changed',
+          snap => {
+            const progress = snap.bytesTransferred / snap.totalBytes;
+            const speed    = (snap.bytesTransferred / 1048576) / Math.max(0.001, (Date.now()-t0)/1000);
+            onProgress?.(progress, speed);
+            update(dbRef(rtdb, `progress/${uid}/${fileId}`),
+              { progress, speed: Math.round(speed), name: file.name, device: DEV, ts: dbTS() }).catch(()=>{});
+          },
+          err => { onError?.(err); reject(err); },
+          async () => {
+            const downloadURL = await getDownloadURL(task.snapshot.ref);
+            const result = { deduped: false, downloadURL, filePath: storagePath, name: file.name, size: file.size, folder: folder || '' };
+            await Promise.allSettled([
+              setDoc(doc(db, 'transfers', uid, 'files', fileId), {
+                name: file.name, size: file.size, filePath: storagePath, downloadURL,
+                folder: folder || '', status: 'complete', ts: serverTimestamp()
+              }, { merge: true }),
+              setDoc(doc(db, 'dedup', fileId), { downloadURL, filePath: storagePath, uid, ts: serverTimestamp() }),
+            ]);
+            update(dbRef(rtdb, `progress/${uid}/${fileId}`),
+              { progress: 1, speed: 0, status: 'done', ts: dbTS() }).catch(()=>{});
+            onComplete?.(result); resolve(result);
+          }
+        );
+      });
+    },
+
+    async delete(filePath, fileId) {
+      const user = window._fbUser;
+      if (!user) return;
+      const ops = [deleteDoc(doc(db, 'transfers', user.uid, 'files', fileId)).catch(()=>{})];
+      if (filePath) ops.push(deleteObject(ref(stor, filePath)).catch(()=>{}));
+      ops.push(deleteDoc(doc(db, 'dedup', fileId)).catch(()=>{}));
+      await Promise.allSettled(ops);
+    },
+
+    async logActivity(fileId, action) {
+      const user = window._fbUser;
+      if (!user) return;
+      await addDoc(collection(db, 'activity', fileId, 'log'), {
+        uid: user.uid, email: user.email || '', action, ts: serverTimestamp()
+      }).catch(()=>{});
+    },
+  };
+
+  // ── History listener ────────────────────────────────────────────────────────
+  let _histUnsub = null;
+  function _listenHistory(uid) {
+    _histUnsub?.();
+    const q = query(collection(db, 'transfers', uid, 'files'), orderBy('ts','desc'), limit(200));
+    _histUnsub = onSnapshot(q, snap => {
+      window.dispatchEvent(new CustomEvent('fb-history', {
+        detail: snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      }));
+    }, ()=>{});
+  }
+
+  // ── Presence ────────────────────────────────────────────────────────────────
+  async function _setPresence(uid) {
+    const r = dbRef(rtdb, `presence/${uid}/${DEV}`);
+    await set(r, { online: true, device: DEV, ua: navigator.userAgent.slice(0,60), ts: dbTS() });
+    onDisconnect(r).update({ online: false, ts: dbTS() });
+  }
+
+  // ── RTDB progress listener ──────────────────────────────────────────────────
+  window._listenRTDB = function(uid, cb) {
+    const r = dbRef(rtdb, `progress/${uid}`);
+    onValue(r, snap => { if(snap.exists()) cb(snap.val()); });
+    return () => off(r);
+  };
+
+  // ── Expose Firestore fns ─────────────────────────────────────────────────────
+  window._dartFS = { db, collection, query, where, orderBy, limit, onSnapshot,
+    addDoc, setDoc, getDoc, getDocs, deleteDoc, doc, serverTimestamp, updateDoc };
+}
+
+async function _hashId(file) {
+  const raw = new TextEncoder().encode(`${file.name}|${file.size}|${file.lastModified||0}`);
+  const buf = await crypto.subtle.digest('SHA-256', raw);
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,40);
+}
+</script>
+</head>
+<body>
+
+<!-- ── Login gate ──────────────────────────────────────────────────────────── -->
+<div id="loginGate">
+  <div class="gate-logo">DART</div>
+  <div class="gate-sub">Your Personal File Locker</div>
+  <div class="gate-tagline">
+    Upload · Organise · Share · Publish<br>
+    <span>Private by default. Yours to control.</span>
+  </div>
+  <div class="gate-btns">
+    <button class="gate-btn primary" onclick="FB.signInGoogle()">⟁ Sign in with Google</button>
+    <button class="gate-btn" onclick="FB.signInAnonymously()">⟁ Sign in Anonymously</button>
+  </div>
+  <div class="gate-notice">Sign in to access your files. All files are private unless you choose to share or publish them.</div>
+</div>
+
+<div id="notifs"></div>
+<div class="wrap">
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header class="hdr">
+  <div>
+    <div class="logo-word">DART</div>
+    <div class="logo-sub">Your Personal File Locker</div>
+  </div>
+  <div class="auth-area">
+    <div class="fb-dot" id="fbDot"></div>
+    <div class="user-chip" id="userChip" style="display:none">
+      <div class="user-avatar" id="userAv">?</div>
+      <span class="user-chip-name" id="authLbl">—</span>
+    </div>
+    <button class="btn btn-n btn-sm" id="authBtn" onclick="FB.signInGoogle()">Sign In</button>
+    <button class="btn btn-n btn-sm" onclick="FB?.signOut?.()" style="display:none" id="signOutBtn">Sign Out</button>
+  </div>
+</header>
+
+<!-- ── Config notice ────────────────────────────────────────────────────────── -->
+<div class="cfg-notice" id="cfgNotice">
+  <span style="font-size:1rem">⚠</span>
+  <div><strong>Firebase not configured.</strong> Open <code>index.html</code> and fill in <code>FIREBASE_CONFIG</code>.
+  Get your config from <a href="https://console.firebase.google.com" target="_blank" rel="noopener">Firebase Console → Project Settings → Your Apps</a>.</div>
+</div>
+
+<!-- ── Firebase badges ──────────────────────────────────────────────────────── -->
+<div class="auth-bar">
+  <span style="font-size:.42rem;letter-spacing:3px;color:var(--mu)">FIREBASE</span>
+  <span class="badge-sm" id="badgeAuth">Auth —</span>
+  <span class="badge-sm" id="badgeStore">Storage —</span>
+  <span class="badge-sm" id="badgeFS">Firestore —</span>
+  <span class="badge-sm" id="badgeRTDB">RTDB —</span>
+</div>
+
+<!-- ── Status banner ────────────────────────────────────────────────────────── -->
+<div class="bn idle" id="bn">◈ Sign in to start uploading</div>
+
+<!-- ── Metrics ──────────────────────────────────────────────────────────────── -->
+<div class="metrics">
+  <div class="mc"><div class="mv" id="mSpeed">—</div><div class="ml">Throughput</div></div>
+  <div class="mc"><div class="mv" id="mPeak">0</div><div class="ml">Peak</div></div>
+  <div class="mc"><div class="mv" id="mDone">0</div><div class="ml">Files Done</div></div>
+  <div class="mc"><div class="mv" id="mBytes">0.00</div><div class="ml">GB Transferred</div></div>
+  <div class="mc"><div class="mv" id="mDedup">0</div><div class="ml">Deduped</div></div>
+</div>
+<div class="bw-bar"><div class="bw-fill" id="bwFill"></div></div>
+
+<!-- ── Drop zone ────────────────────────────────────────────────────────────── -->
+<div class="dz" id="dz"
+  ondragover="event.preventDefault();this.classList.add('drag')"
+  ondragleave="this.classList.remove('drag')"
+  ondrop="onDrop(event)">
+  <input type="file" id="fi"  multiple onchange="addFiles([...this.files])">
+  <input type="file" id="fi2" multiple webkitdirectory onchange="addFiles([...this.files])">
+  <div class="dz-icon">⟁</div>
+  <div class="dz-txt">Drop files or folders here</div>
+  <div class="dz-sub">or click to browse · any file type · up to 10 GB each</div>
+</div>
+
+<!-- ── Controls ─────────────────────────────────────────────────────────────── -->
+<div class="controls">
+  <button class="btn btn-p" id="btnRun"   onclick="runAll()" disabled>⚡ Upload All</button>
+  <button class="btn btn-n" id="btnPause" onclick="togglePause()" disabled>⏸ Pause</button>
+  <button class="btn btn-n" onclick="document.getElementById('fi').click()">+ Files</button>
+  <button class="btn btn-n" onclick="document.getElementById('fi2').click()">+ Folder</button>
+  <button class="btn btn-n" onclick="clearQueue()">✕ Clear</button>
+  <button class="btn btn-n" onclick="runDemo()">▶ Demo</button>
+  <button class="btn btn-n" onclick="openWorkspace()" style="border-color:var(--d7);color:var(--d7)">⊞ Workspace</button>
+  <button class="btn btn-n" onclick="openIntegration()" style="margin-left:auto;border-color:var(--dm);color:var(--mu)">⟨/⟩ Integration</button>
+</div>
+
+<!-- ── Upload queue ──────────────────────────────────────────────────────────── -->
+<div class="queue" id="queue"></div>
+
+<!-- ── File Locker ──────────────────────────────────────────────────────────── -->
+<div class="locker" id="fileLocker">
+  <div class="locker-usage-lbl">
+    <span id="lkUsageLbl">My Files</span>
+    <span id="lkUsageSize" style="color:var(--d)"></span>
+  </div>
+  <div class="locker-usage"><div class="locker-usage-fill" id="lkUsageFill" style="width:0%"></div></div>
+
+  <div class="lk-tabs">
+    <button class="lk-tab on" onclick="switchLockerTab('lkMyFiles',this)">My Files</button>
+    <button class="lk-tab"   onclick="switchLockerTab('lkShared',this)">Shared with me</button>
+    <button class="lk-tab"   onclick="switchLockerTab('lkPublic',this)">Community</button>
+    <button class="lk-tab"   onclick="switchLockerTab('lkActivity',this)">Activity</button>
+  </div>
+
+  <!-- My Files -->
+  <div class="lk-pane on" id="lkMyFiles">
+    <div class="breadcrumb" id="breadcrumb">
+      <span class="active" onclick="navToFolder(null)">Home</span>
+    </div>
+    <div class="locker-hdr">
+      <input class="locker-search" id="lkSearch" placeholder="Search files..." oninput="filterLocker()">
+      <select class="locker-sort" id="lkSort" onchange="sortLocker()">
+        <option value="date-desc">Newest first</option>
+        <option value="date-asc">Oldest first</option>
+        <option value="name-asc">Name A–Z</option>
+        <option value="name-desc">Name Z–A</option>
+        <option value="size-desc">Largest first</option>
+        <option value="size-asc">Smallest first</option>
+        <option value="starred">Starred first</option>
+      </select>
+    </div>
+    <div class="lk-toolbar">
+      <button class="btn btn-n btn-sm" onclick="selectAllLocker()" style="font-size:.42rem">Select all</button>
+      <button class="btn btn-n btn-sm" id="lkDeleteSel"   onclick="deleteSelected()"   style="font-size:.42rem;display:none;border-color:var(--d3);color:var(--d3)">Delete selected</button>
+      <button class="btn btn-n btn-sm" id="lkDownloadSel" onclick="downloadSelected()" style="font-size:.42rem;display:none;border-color:var(--d5);color:var(--d5)">↓ Download selected</button>
+      <button class="btn btn-n btn-sm" id="lkZipSel"      onclick="openZipModal()"     style="font-size:.42rem;display:none;border-color:var(--d4);color:var(--d4)">⬡ Zip selected</button>
+      <button class="btn btn-n btn-sm" id="lkMoveSel"     onclick="openMoveModal()"    style="font-size:.42rem;display:none">Move selected</button>
+      <button class="btn btn-n btn-sm" onclick="openNewFolderModal()" style="font-size:.42rem;border-color:var(--d4);color:var(--d4)">+ New folder</button>
+      <span class="lk-count" id="lkCount"></span>
+    </div>
+    <div id="rtdbPane" style="margin-bottom:8px"></div>
+    <div class="lk-grid" id="lkGrid">
+      <div class="lk-empty">Sign in and upload files to see them here</div>
+    </div>
+  </div>
+
+  <!-- Shared with me -->
+  <div class="lk-pane" id="lkShared">
+    <div style="font-size:.46rem;color:var(--mu);margin-bottom:12px">Files shared directly with your email address</div>
+    <div id="swmList"><div class="lk-empty" style="padding:20px 0">No files shared with you yet</div></div>
+  </div>
+
+  <!-- Community (public) -->
+  <div class="lk-pane" id="lkPublic">
+    <div id="pubUsers">
+      <div style="font-size:.46rem;color:var(--mu);margin-bottom:14px">Browse published files by user — click to explore</div>
+      <div class="lk-grid" id="pubUserGrid"><div class="lk-empty">Loading...</div></div>
+    </div>
+    <div id="pubUserFiles" style="display:none">
+      <div class="locker-hdr">
+        <button class="btn btn-n btn-sm" onclick="backToUsers()" style="font-size:.42rem">← Back</button>
+        <div id="pubUserName" style="font-size:.54rem;font-weight:700;flex:1"></div>
+        <input class="locker-search" id="pubSearch" placeholder="Search..." oninput="filterPublic()">
+        <select class="locker-sort" id="pubSort" onchange="filterPublic()">
+          <option value="date-desc">Newest</option>
+          <option value="name-asc">Name A–Z</option>
+          <option value="size-desc">Largest</option>
+        </select>
+      </div>
+      <div class="lk-grid" id="pubGrid"><div class="lk-empty">No public files</div></div>
+    </div>
+  </div>
+
+  <!-- Activity log -->
+  <div class="lk-pane" id="lkActivity">
+    <div style="font-size:.46rem;color:var(--mu);margin-bottom:12px">Downloads of your public and shared files</div>
+    <div id="activityList"><div class="lk-empty" style="padding:20px 0">No activity yet</div></div>
+  </div>
+</div>
+
+<!-- ── Workspace ──────────────────────────────────────────────────────────────── -->
+<div class="workspace" id="wsPanel">
+  <div class="locker-hdr">
+    <div class="locker-title">⊞ Workspace</div>
+    <button class="btn btn-n btn-sm" onclick="clearWorkspace()" style="font-size:.42rem">Clear</button>
+    <button class="btn btn-n btn-sm" onclick="closeWorkspace()" style="font-size:.42rem">Close</button>
+  </div>
+  <div style="font-size:.44rem;color:var(--mu);margin-bottom:12px">
+    Drag files from your locker here to create a working collection. Download all as zip or share together.
+  </div>
+  <div class="ws-grid">
+    <div class="ws-sidebar">
+      <div class="ws-sidebar-title">Your files</div>
+      <div id="wsSidebar"></div>
+    </div>
+    <div>
+      <div class="ws-canvas" id="wsCanvas">
+        <div class="ws-canvas-empty" id="wsCanvasEmpty">Drop files from the sidebar to add them here</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-n btn-sm" onclick="wsDownloadAll()" style="font-size:.42rem;border-color:var(--d5);color:var(--d5)">↓ Download all</button>
+        <button class="btn btn-n btn-sm" onclick="wsZipAll()"      style="font-size:.42rem;border-color:var(--d4);color:var(--d4)">⬡ Zip all</button>
+        <button class="btn btn-n btn-sm" onclick="wsShareAll()"    style="font-size:.42rem;border-color:var(--d6);color:var(--d6)">⟁ Share all</button>
+        <span id="wsCount" style="font-size:.44rem;color:var(--mu);align-self:center;margin-left:auto"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Integration panel ──────────────────────────────────────────────────────── -->
+<div class="int-panel" id="intPanel" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:.46rem;letter-spacing:3px;color:var(--d7);text-transform:uppercase">⟨/⟩ Integration</div>
+    <button class="int-copy" onclick="document.getElementById('intPanel').style.display='none'">✕ Close</button>
+  </div>
+  <div class="int-tabs">
+    <button class="int-tab on" onclick="switchIntTab('intSnippet',this)">Snippet</button>
+    <button class="int-tab"   onclick="switchIntTab('intSDK',this)">SDK</button>
+    <button class="int-tab"   onclick="switchIntTab('intAPI',this)">REST API</button>
+  </div>
+  <div class="int-pane on" id="intSnippet">
+    <div style="margin-bottom:10px">
+      <select class="csel" id="snipFW" onchange="renderSnippet()">
+        <option value="vanilla">Vanilla JS</option><option value="react">React</option>
+        <option value="vue">Vue 3</option><option value="svelte">Svelte</option>
+      </select>
+      <select class="csel" id="snipFeat" onchange="renderSnippet()">
+        <option value="button">Upload Button</option><option value="dropzone">Drop Zone</option><option value="progress">Progress Bar</option><option value="full">Full Widget</option><option value="publishLocker">Upload to Locker</option><option value="publishPublic">Publish Publicly</option>
+      </select>
+    </div>
+    <div class="int-code-wrap">
+      <button class="int-copy" onclick="copySnip(this)">Copy</button>
+      <div class="int-code" id="snipCode"></div>
+    </div>
+  </div>
+  <div class="int-pane" id="intSDK">
+    <div style="margin-bottom:10px">
+      <select class="csel" id="sdkMeth" onchange="renderSDK()">
+        <option value="upload">upload()</option><option value="uploadMultiple">uploadMultiple()</option>
+        <option value="onProgress">onProgress()</option><option value="onComplete">onComplete()</option>
+        <option value="history">listenHistory()</option><option value="delete">delete()</option>
+        <option value="init">Full init</option>
+      </select>
+    </div>
+    <div class="int-code-wrap">
+      <button class="int-copy" onclick="copySDK(this)">Copy</button>
+      <div class="int-code" id="sdkCode"></div>
+    </div>
+  </div>
+  <div class="int-pane" id="intAPI">
+    <div style="font-size:.46rem;color:var(--mu);margin-bottom:10px">REST API (requires dart-server-v5.js)</div>
+    <div id="apiDocs"></div>
+  </div>
+</div>
+
+<!-- ── Modals ──────────────────────────────────────────────────────────────────── -->
+
+<!-- Share modal -->
+<div class="modal-bg" id="shareModal" onclick="if(event.target===this)closeModal('shareModal')">
+  <div class="modal">
+    <div class="modal-title">⟁ Share file</div>
+    <div class="modal-file" id="shareModalName"></div>
+    <div class="modal-label">Recipient email</div>
+    <input class="modal-input" id="shareEmail" type="email" placeholder="friend@example.com" onkeydown="if(event.key==='Enter')doShare()">
+    <div class="modal-hint">They'll see this in their "Shared with me" tab instantly.</div>
+    <div class="modal-err" id="shareErr"></div>
+    <div id="existingShares"></div>
+    <div class="modal-row">
+      <button class="btn btn-n btn-sm" onclick="closeModal('shareModal')">Cancel</button>
+      <button class="btn btn-s btn-sm" id="shareBtn" onclick="doShare()">Share</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rename/retype modal -->
+<div class="modal-bg" id="renameModal" onclick="if(event.target===this)closeModal('renameModal')">
+  <div class="modal">
+    <div class="modal-title">✎ Rename file</div>
+    <div class="modal-file" id="renameModalCurrent"></div>
+    <div class="modal-label">New name (without extension)</div>
+    <input class="modal-input" id="renameInput" type="text" onkeydown="if(event.key==='Enter')doRename()">
+    <div class="modal-label" style="margin-top:6px">Extension / file type</div>
+    <div class="ext-list" id="extList"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:.44rem;color:var(--mu)">Custom:</span>
+      <input class="modal-input" id="extCustom" type="text" placeholder=".pdf"
+        style="width:100px;margin-bottom:0" oninput="selectExt(null,this.value)">
+    </div>
+    <div class="modal-err" id="renameErr"></div>
+    <div class="modal-row">
+      <button class="btn btn-n btn-sm" onclick="closeModal('renameModal')">Cancel</button>
+      <button class="btn btn-s btn-sm" onclick="doRename()">Rename</button>
+    </div>
+  </div>
+</div>
+
+<!-- New folder modal -->
+<div class="modal-bg" id="newFolderModal" onclick="if(event.target===this)closeModal('newFolderModal')">
+  <div class="modal">
+    <div class="modal-title">📁 New folder</div>
+    <div class="modal-label">Folder name</div>
+    <input class="modal-input" id="newFolderName" type="text" placeholder="My folder" onkeydown="if(event.key==='Enter')doNewFolder()">
+    <div class="modal-err" id="newFolderErr"></div>
+    <div class="modal-row">
+      <button class="btn btn-n btn-sm" onclick="closeModal('newFolderModal')">Cancel</button>
+      <button class="btn btn-s btn-sm" onclick="doNewFolder()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Move modal -->
+<div class="modal-bg" id="moveModal" onclick="if(event.target===this)closeModal('moveModal')">
+  <div class="modal">
+    <div class="modal-title">Move files</div>
+    <div class="modal-file" id="moveModalDesc"></div>
+    <div class="modal-label">Move to folder</div>
+    <div class="move-folder-list" id="moveFolderList"></div>
+    <div class="modal-err" id="moveErr"></div>
+    <div class="modal-row">
+      <button class="btn btn-n btn-sm" onclick="closeModal('moveModal')">Cancel</button>
+      <button class="btn btn-s btn-sm" onclick="doMove()">Move</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preview modal -->
+<div class="modal-bg" id="previewModal" onclick="if(event.target===this)closeModal('previewModal')">
+  <div class="modal preview-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="modal-title" id="previewTitle">Preview</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-n btn-sm" id="previewDlBtn" style="font-size:.42rem">↓ Download</button>
+        <button class="btn btn-n btn-sm" onclick="closeModal('previewModal')" style="font-size:.42rem">✕</button>
+      </div>
+    </div>
+    <div class="preview-inner" id="previewInner">
+      <div style="color:var(--mu);font-size:.5rem;padding:40px">Loading preview...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Comments modal -->
+<div class="modal-bg" id="commentsModal" onclick="if(event.target===this)closeModal('commentsModal')">
+  <div class="modal">
+    <div class="modal-title">💬 Comments</div>
+    <div class="modal-file" id="commentsModalName"></div>
+    <div class="comment-list" id="commentList"></div>
+    <div class="modal-label">Add a comment</div>
+    <input class="modal-input" id="commentInput" type="text" placeholder="Write a comment..." onkeydown="if(event.key==='Enter')postComment()">
+    <div class="modal-row">
+      <button class="btn btn-n btn-sm" onclick="closeModal('commentsModal')">Close</button>
+      <button class="btn btn-s btn-sm" onclick="postComment()">Post</button>
+    </div>
+  </div>
+</div>
+
+<!-- Zip modal -->
+<div class="modal-bg" id="zipModal" onclick="if(event.target===this)closeModal('zipModal')">
+  <div class="modal">
+    <div class="modal-title">⬡ Create Zip</div>
+    <div class="modal-label">Zip filename</div>
+    <input class="modal-input" id="zipName" type="text" placeholder="archive.zip">
+    <div class="zip-file-list" id="zipFileList"></div>
+    <div class="modal-label" style="margin-top:6px">Password (optional)</div>
+    <input class="modal-input" id="zipPassword" type="password" placeholder="Leave blank for no password">
+    <div class="modal-hint">
+      Password-protected zips use AES encryption in the browser.<br>
+      The recipient needs the password to extract.
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <input type="checkbox" id="zipPublish" style="accent-color:var(--d)">
+      <label for="zipPublish" style="font-size:.46rem;color:var(--mu);cursor:pointer">Publish zip to community after creating</label>
+    </div>
+    <div class="modal-err" id="zipErr"></div>
+    <div class="modal-row">
+      <button class="btn btn-n btn-sm" onclick="closeModal('zipModal')">Cancel</button>
+      <button class="btn btn-s btn-sm" id="zipBtn" onclick="doZip()">⬡ Create Zip</button>
+    </div>
+  </div>
+</div>
+
+<!-- Workspace share modal -->
+<div class="modal-bg" id="wsShareModal" onclick="if(event.target===this)closeModal('wsShareModal')">
+  <div class="modal">
+    <div class="modal-title">⟁ Share workspace</div>
+    <div class="modal-hint" id="wsShareDesc"></div>
+    <div class="modal-label">Recipient email</div>
+    <input class="modal-input" id="wsShareEmail" type="email" placeholder="friend@example.com" onkeydown="if(event.key==='Enter')doWsShare()">
+    <div class="modal-err" id="wsShareErr"></div>
+    <div class="modal-row">
+      <button class="btn btn-n btn-sm" onclick="closeModal('wsShareModal')">Cancel</button>
+      <button class="btn btn-s btn-sm" onclick="doWsShare()">Share all</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════════════════════
+const S = {
+  queue: [], running: false, paused: false,
+  peakSpeed: 0, filesDone: 0, totalBytes: 0, deduped: 0,
+};
+const M = {};
+let tickerOn = false, tickerRAF = null;
+
+// ════════════════════════════════════════════════════════════════════════════
+//  UTILITIES
+// ════════════════════════════════════════════════════════════════════════════
+// Safe HTML escaping — prevents XSS in all innerHTML interpolations
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+// Safe HTML escaping — prevents XSS in all innerHTML interpolations
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Escape for use inside onclick="fn('VALUE')" — escapes backslash, quotes, newlines
+function escAttr(s) {
+  if (s == null) return '';
+  return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,' ');
+}
+
+function fmtBytes(b) {
+  if (!b) return '0 B';
+  const u = ['B','KB','MB','GB','TB'], i = Math.min(4, Math.floor(Math.log(b)/Math.log(1024)));
+  return (b/Math.pow(1024,i)).toFixed(i?1:0)+' '+u[i];
+}
+function fmtSpeed(s) { return s>=1000?(s/1000).toFixed(2)+' GB/s':s.toFixed(0)+' MB/s'; }
+function fmtDate(ts) { return ts?.seconds?new Date(ts.seconds*1000).toLocaleDateString():''; }
+function fmtDateFull(ts) { return ts?.seconds?new Date(ts.seconds*1000).toLocaleString():''; }
+function fileIcon(name) {
+  const e = (name||'').split('.').pop().toLowerCase();
+  const m = {pdf:'📄',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',webp:'🖼️',svg:'🖼️',
+    mp4:'🎬',mov:'🎬',avi:'🎬',mkv:'🎬',mp3:'🎵',wav:'🎵',flac:'🎵',
+    zip:'📦',gz:'📦','7z':'📦',tar:'📦',
+    doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',ppt:'📋',pptx:'📋',
+    txt:'📃',md:'📃',json:'⚙️',js:'⚙️',ts:'⚙️',py:'⚙️',html:'🌐',css:'🎨',
+  };
+  return m[e]||'📁';
+}
+function closeModal(id) { document.getElementById(id)?.classList.remove('show'); }
+function openModal(id)  { document.getElementById(id)?.classList.add('show'); }
+
+// ════════════════════════════════════════════════════════════════════════════
+//  NOTIFICATIONS
+// ════════════════════════════════════════════════════════════════════════════
+window._notify = function(msg, type='i') {
+  const el = document.createElement('div');
+  el.className = 'notif '+type;
+  el.textContent = msg;
+  document.getElementById('notifs').prepend(el);
+  setTimeout(() => el.remove(), 4000);
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+//  AUTH STATE
+// ════════════════════════════════════════════════════════════════════════════
+window.addEventListener('fb-auth', e => {
+  const user = e.detail;
+  const dot  = document.getElementById('fbDot');
+  const lbl  = document.getElementById('authLbl');
+  const av   = document.getElementById('userAv');
+  const chip = document.getElementById('userChip');
+  const btn  = document.getElementById('authBtn');
+  const sout = document.getElementById('signOutBtn');
+
+  if (user) {
+    if (dot)  dot.classList.add('on');
+    if (lbl)  lbl.textContent = user.displayName || user.email || user.uid.slice(0,8);
+    if (av)   av.textContent  = (user.displayName||user.email||'?')[0].toUpperCase();
+    if (chip) chip.style.display = '';
+    if (btn)  btn.style.display  = 'none';
+    if (sout) sout.style.display = '';
+    document.getElementById('loginGate')?.classList.add('hidden');
+    document.getElementById('fileLocker')?.classList.add('show');
+    ['badgeAuth','badgeStore','badgeFS','badgeRTDB'].forEach((id,i)=>{
+      const b = document.getElementById(id);
+      if(b){b.textContent=['Auth','Storage','Firestore','RTDB'][i]+' ✓';b.classList.add('ok');}
+    });
+    setBanner('ready', '✓ Signed in as '+(user.displayName||user.email));
+    updateControls();
+    if(window._listenRTDB) window._listenRTDB(user.uid, updateRTDBPane);
+    loadActivityLog();
+  } else {
+    if (dot)  dot.classList.remove('on');
+    if (chip) chip.style.display = 'none';
+    if (btn)  btn.style.display  = '';
+    if (sout) sout.style.display = 'none';
+    document.getElementById('loginGate')?.classList.remove('hidden');
+    document.getElementById('fileLocker')?.classList.remove('show');
+    if (window._folderSnapUnsub) { window._folderSnapUnsub(); window._folderSnapUnsub = null; }
+    setBanner('idle', '◈ Sign in to start uploading');
+    updateControls();
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  FILE LOCKER STATE
+// ════════════════════════════════════════════════════════════════════════════
+let _lockerFiles  = [];
+let _lockerShown  = [];
+let _lockerSel    = new Set();
+let _lockerFolders = {}; // { folderName: { name, createdAt } }
+let _currentFolder = null; // null = root
+
+window.addEventListener('fb-history', e => {
+  const all = (e.detail||[]).filter(t => t.status==='complete');
+  // Build folder set from file metadata
+  _lockerFolders = {};
+  for (const f of all) {
+    if (f.folder) _lockerFolders[f.folder] = _lockerFolders[f.folder] || { name: f.folder, ts: f.ts };
+  }
+  // Load folders from Firestore (already merged from file.folder fields above)
+  _lockerFiles = all;
+  // Load explicit folder docs from Firestore — set up listener once, not on every history update
+  if (window._dartFS && window._fbUser && !window._folderSnapUnsub) {
+    const {db,collection,onSnapshot:onSnap} = window._dartFS;
+    try {
+      window._folderSnapUnsub = onSnap(collection(db,'transfers',window._fbUser.uid,'folders'), snap=>{
+        snap.docs.forEach(d=>{ const fd=d.data(); if(fd.name) _lockerFolders[fd.name]={name:fd.name,ts:fd.ts}; });
+        applyLockerView();
+      }, ()=>{});
+    } catch{}
+  }
+  applyLockerView();
+  updateLockerUsage();
+});
+
+function applyLockerView() {
+  const q    = (document.getElementById('lkSearch')?.value||'').toLowerCase();
+  const sort = document.getElementById('lkSort')?.value||'date-desc';
+
+  // Filter to current folder
+  let files = _lockerFiles.filter(f => (f.folder||'') === (_currentFolder||''));
+  if (q) files = files.filter(f => (f.name||'').toLowerCase().includes(q));
+
+  files.sort((a,b) => {
+    if (sort==='starred')    return (b.isStarred?1:0)-(a.isStarred?1:0);
+    if (sort==='name-asc')   return (a.name||'').localeCompare(b.name||'');
+    if (sort==='name-desc')  return (b.name||'').localeCompare(a.name||'');
+    if (sort==='size-desc')  return (b.size||0)-(a.size||0);
+    if (sort==='size-asc')   return (a.size||0)-(b.size||0);
+    if (sort==='date-asc')   return (a.ts?.seconds||0)-(b.ts?.seconds||0);
+    return (b.ts?.seconds||0)-(a.ts?.seconds||0);
+  });
+  // Starred always first within sort
+  if (sort!=='starred') {
+    files.sort((a,b)=>(b.isStarred?1:0)-(a.isStarred?1:0));
+  }
+  _lockerShown = files;
+
+  // Build breadcrumb
+  const bc = document.getElementById('breadcrumb');
+  if (bc) {
+    if (!_currentFolder) {
+      bc.innerHTML = '<span class="active">Home</span>';
+    } else {
+      bc.innerHTML = `<span onclick="navToFolder(null)">Home</span><span class="breadcrumb-sep">/</span><span class="active">${esc(_currentFolder)}</span>`;
+    }
+  }
+  renderLockerGrid();
+}
+
+function renderLockerGrid() {
+  const grid  = document.getElementById('lkGrid');
+  const count = document.getElementById('lkCount');
+  if (!grid) return;
+
+  // Get subfolders at current level
+  const subfolders = _currentFolder ? [] :
+    Object.keys(_lockerFolders).filter(f => !f.includes('/'));
+  const allSubfolders = Object.keys(_lockerFolders);
+
+  if (!_lockerShown.length && !subfolders.length) {
+    grid.innerHTML = `<div class="lk-empty">${_currentFolder?'No files in this folder':'Upload something to get started'}</div>`;
+    if (count) count.textContent = '';
+    return;
+  }
+
+  const total = _lockerShown.length + subfolders.length;
+  if (count) count.textContent = total+' item'+(total!==1?'s':'');
+
+  // Render folders first, then files
+  const folderCards = subfolders.map(fname => {
+    const files = _lockerFiles.filter(f=>f.folder===fname);
+    const size  = files.reduce((s,f)=>s+(f.size||0),0);
+    const sel   = _lockerSel.has('folder:'+fname);
+    const feid = esc(fname.replace(/\W/g,'_')), feat = escAttr(fname);
+    return `<div class="folder-card${sel?' selected':''}" id="fc-${feid}"
+        onclick="handleFolderClick('${feat}',event)">
+      <div class="folder-icon">📁</div>
+      <div class="folder-name" title="${esc(fname)}">${esc(fname)}</div>
+      <div class="folder-meta">${files.length} file${files.length!==1?'s':''} · ${fmtBytes(size)}</div>
+      <div class="lk-actions" onclick="event.stopPropagation()">
+        <button class="lk-btn del" onclick="deleteFolder('${feat}')">✕ Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const fileCards = _lockerShown.map(f => {
+    const ext  = (f.name||'').split('.').pop()?.toUpperCase().slice(0,6)||'FILE';
+    const sel  = _lockerSel.has(f.id);
+    const icon = fileIcon(f.name);
+    const fid = escAttr(f.id), fname2 = esc(f.name||'Unnamed'), ftitle = esc(f.name||''), fdlurl = escAttr(f.downloadURL||'');
+    return `<div class="lk-card${sel?' selected':''}${f.isPublic?' is-public':''}${f.isStarred?' is-starred':''}"
+        id="lkc-${esc(f.id)}" onclick="toggleSelect('${fid}',event)">
+      <div class="lk-badges">
+        ${f.isStarred?'<span class="lk-badge star">★ Starred</span>':''}
+        ${f.isPublic ?'<span class="lk-badge pub">● Public</span>':''}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+        <span style="font-size:1rem">${icon}</span>
+        <span class="lk-ext">${esc(ext)}</span>
+      </div>
+      <div class="lk-name" title="${ftitle}"
+        ondblclick="openPreviewModal('${fid}',event)">${fname2}</div>
+      <div class="lk-meta">
+        <span>${fmtBytes(f.size||0)}</span>
+        <span>${fmtDate(f.ts)}</span>
+      </div>
+      <div class="lk-actions" onclick="event.stopPropagation()">
+        ${f.downloadURL?`<button class="lk-btn dl" onclick="parallelDownload('${fdlurl}','${escAttr(f.name||'')}',${f.size||0})">↓</button>`:''}
+        <button class="lk-btn" onclick="openPreviewModal('${fid}',event)" title="Preview">👁</button>
+        <button class="lk-btn star" onclick="toggleStar('${fid}')">${f.isStarred?'★':'☆'}</button>
+        <button class="lk-btn" onclick="openRenameModal('${fid}')" title="Rename">✎</button>
+        <button class="lk-btn sh" onclick="openShareModal('${fid}')">⟁</button>
+        <button class="lk-btn" onclick="openCommentsModal('${fid}')">💬</button>
+        ${f.isPublic
+          ?`<button class="lk-btn unpub" onclick="togglePublic('${fid}',false)">⊘</button>`
+          :`<button class="lk-btn pub"   onclick="togglePublic('${fid}',true)">⊕</button>`}
+        <button class="lk-btn del" onclick="deleteFile('${fid}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  grid.innerHTML = folderCards + fileCards;
+}
+
+function updateLockerUsage() {
+  const total = _lockerFiles.reduce((s,f)=>s+(f.size||0),0);
+  const FREE  = 5*1024**3;
+  const lbl   = document.getElementById('lkUsageLbl');
+  const sz    = document.getElementById('lkUsageSize');
+  const fill  = document.getElementById('lkUsageFill');
+  if (lbl)  lbl.textContent  = `My Files (${_lockerFiles.length})`;
+  if (sz)   sz.textContent   = fmtBytes(total)+' of 5 GB';
+  if (fill) fill.style.width = Math.min(100,(total/FREE)*100)+'%';
+}
+
+function filterLocker()  { applyLockerView(); }
+function sortLocker()    { applyLockerView(); }
+
+// ── Folder navigation ────────────────────────────────────────────────────────
+function navToFolder(name) {
+  _currentFolder = name;
+  _lockerSel.clear();
+  applyLockerView();
+}
+function handleFolderClick(fname, e) {
+  if (e.target.classList.contains('lk-btn')) return;
+  navToFolder(fname);
+}
+
+// ── Selection ────────────────────────────────────────────────────────────────
+function toggleSelect(id, e) {
+  if (e.target.classList.contains('lk-btn')||e.target.classList.contains('lk-name')) return;
+  if (_lockerSel.has(id)) _lockerSel.delete(id); else _lockerSel.add(id);
+  const card = document.getElementById('lkc-'+id);
+  if (card) card.classList.toggle('selected', _lockerSel.has(id));
+  updateSelectionToolbar();
+}
+function updateSelectionToolbar() {
+  const n = _lockerSel.size;
+  ['lkDeleteSel','lkDownloadSel','lkZipSel','lkMoveSel'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.style.display = n?'':'none';
+  });
+}
+function selectAllLocker() {
+  if (_lockerSel.size===_lockerShown.length) _lockerSel.clear();
+  else _lockerShown.forEach(f=>_lockerSel.add(f.id));
+  renderLockerGrid(); updateSelectionToolbar();
+}
+
+// ── Download ──────────────────────────────────────────────────────────────────
+function downloadFile(id) {
+  const f = _lockerFiles.find(x=>x.id===id);
+  if (f?.downloadURL) parallelDownload(f.downloadURL, f.name, f.size||0);
+}
+function downloadSelected() {
+  _lockerShown.filter(f=>_lockerSel.has(f.id)).forEach((f,i)=>{
+    setTimeout(()=>parallelDownload(f.downloadURL,f.name,f.size||0), i*350);
+  });
+}
+function copyLink(id) {
+  const f = _lockerFiles.find(x=>x.id===id);
+  if (f?.downloadURL) navigator.clipboard.writeText(f.downloadURL).then(()=>_notify('Link copied','s'));
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+async function deleteFile(id) {
+  const f = _lockerFiles.find(x=>x.id===id);
+  if (!f) return;
+  if (!confirm(`Delete "${f.name}"? This cannot be undone.`)) return;
+  try {
+    if (f.isPublic) await deleteDoc_pub(id);
+    await FB.delete(f.filePath, id);
+    _lockerFiles = _lockerFiles.filter(x=>x.id!==id);
+    _lockerSel.delete(id);
+    applyLockerView(); updateLockerUsage();
+    _notify('Deleted '+f.name,'s');
+  } catch(e) { _notify('Delete failed: '+e.message,'e'); }
+}
+async function deleteSelected() {
+  const sel = _lockerShown.filter(f=>_lockerSel.has(f.id));
+  if (!sel.length) return;
+  if (!confirm(`Delete ${sel.length} file${sel.length>1?'s':''}? Cannot be undone.`)) return;
+  for (const f of sel) {
+    try { if (f.isPublic) await deleteDoc_pub(f.id); await FB.delete(f.filePath,f.id); } catch{}
+    _lockerFiles = _lockerFiles.filter(x=>x.id!==f.id);
+    _lockerSel.delete(f.id);
+  }
+  applyLockerView(); updateLockerUsage();
+  _notify(`Deleted ${sel.length} file${sel.length>1?'s':''}`, 's');
+}
+async function deleteDoc_pub(id) {
+  if (!window._dartFS) return;
+  const {db,doc,deleteDoc} = window._dartFS;
+  await deleteDoc(doc(db,'public_files',id)).catch(()=>{});
+}
+
+// ── Folders ──────────────────────────────────────────────────────────────────
+function openNewFolderModal() { openModal('newFolderModal'); setTimeout(()=>document.getElementById('newFolderName')?.focus(),80); }
+async function doNewFolder() {
+  const name = document.getElementById('newFolderName')?.value.trim();
+  const err  = document.getElementById('newFolderErr');
+  if (!name) { if(err) err.textContent='Enter a folder name'; return; }
+  if (/[\/\\]/.test(name)) { if(err) err.textContent='No slashes in folder name'; return; }
+  const user = window._fbUser;
+  if (!user) return;
+  try {
+    const {db, doc, setDoc, serverTimestamp} = window._dartFS;
+    const folderId = 'folder_' + name.replace(/\s+/g,'_') + '_' + Date.now();
+    await setDoc(doc(db, 'transfers', user.uid, 'folders', folderId), {
+      name, ts: serverTimestamp(), uid: user.uid
+    });
+    _lockerFolders[name] = { name };
+    document.getElementById('newFolderName').value = '';
+    closeModal('newFolderModal');
+    renderLockerGrid();
+    _notify('Folder "'+name+'" created','s');
+  } catch(e) { if(err) err.textContent='Error: '+e.message; }
+}
+async function deleteFolder(fname) {
+  const files = _lockerFiles.filter(f=>f.folder===fname);
+  if (!confirm(`Delete folder "${fname}" and its ${files.length} file${files.length!==1?'s':''}?`)) return;
+  const user = window._fbUser;
+  const {db, collection, query, where, getDocs, deleteDoc, doc} = window._dartFS;
+  for (const f of files) {
+    try { if(f.isPublic) await deleteDoc_pub(f.id); await FB.delete(f.filePath,f.id); } catch{}
+  }
+  _lockerFiles = _lockerFiles.filter(f=>f.folder!==fname);
+  // Delete folder doc from Firestore
+  try {
+    const q = query(collection(db,'transfers',user.uid,'folders'), where('name','==',fname));
+    const snap = await getDocs(q);
+    for (const d of snap.docs) await deleteDoc(doc(db,'transfers',user.uid,'folders',d.id));
+  } catch{}
+  delete _lockerFolders[fname];
+  applyLockerView(); updateLockerUsage();
+  _notify('Folder "'+fname+'" deleted','s');
+}
+
+// ── Move ─────────────────────────────────────────────────────────────────────
+let _moveTargetIds = [];
+function openMoveModal() {
+  _moveTargetIds = [..._lockerSel].filter(id=>!id.startsWith('folder:'));
+  if (!_moveTargetIds.length) return;
+  document.getElementById('moveModalDesc').textContent = `Moving ${_moveTargetIds.length} file${_moveTargetIds.length>1?'s':''}`;
+  // Build folder list
+  const list = document.getElementById('moveFolderList');
+  const folders = [null, ...Object.keys(_lockerFolders)];
+  list.innerHTML = folders.map(f=>
+    `<div class="move-folder-item${f===_currentFolder?' selected':''}" onclick="this.parentNode.querySelectorAll('.move-folder-item').forEach(x=>x.classList.remove('selected'));this.classList.add('selected');this.dataset.dest='${f||''}'">
+      <span>${f?'📁 '+f:'🏠 Root'}</span>
+    </div>`
+  ).join('');
+  if (list.firstChild) list.firstChild.dataset.dest = '';
+  openModal('moveModal');
+}
+async function doMove() {
+  const sel = document.querySelector('.move-folder-item.selected');
+  if (!sel) return;
+  const dest = sel.dataset.dest || '';
+  const {db, doc, setDoc} = window._dartFS;
+  const user = window._fbUser;
+  for (const id of _moveTargetIds) {
+    try {
+      await setDoc(doc(db,'transfers',user.uid,'files',id),{folder:dest},{merge:true});
+      const f = _lockerFiles.find(x=>x.id===id);
+      if (f) f.folder = dest;
+    } catch{}
+  }
+  _lockerSel.clear();
+  closeModal('moveModal');
+  applyLockerView();
+  _notify('Moved files','s');
+}
+
+// ── Star ─────────────────────────────────────────────────────────────────────
+async function toggleStar(id) {
+  const f = _lockerFiles.find(x=>x.id===id);
+  if (!f) return;
+  f.isStarred = !f.isStarred;
+  const {db,doc,setDoc} = window._dartFS;
+  await setDoc(doc(db,'transfers',window._fbUser.uid,'files',id),{isStarred:f.isStarred},{merge:true});
+  renderLockerGrid();
+  _notify(f.isStarred?'★ Starred':'Unstarred','s');
+}
+
+// ── Rename / retype ───────────────────────────────────────────────────────────
+const COMMON_EXTS = ['.pdf','.txt','.md','.csv','.json','.xml','.jpg','.jpeg','.png',
+  '.gif','.webp','.svg','.mp4','.mp3','.wav','.mov','.zip','.tar','.gz','.7z',
+  '.doc','.docx','.xls','.xlsx','.ppt','.pptx','.html','.css','.js','.ts','.py','.java'];
+let _renameTargetId=null, _renameChosenExt=null;
+
+function openRenameModal(id) {
+  const f = _lockerFiles.find(x=>x.id===id);
+  if (!f) return;
+  _renameTargetId = id;
+  const di = f.name.lastIndexOf('.');
+  const base = di>0?f.name.slice(0,di):f.name;
+  const ext  = di>0?f.name.slice(di):'';
+  _renameChosenExt = ext;
+  document.getElementById('renameModalCurrent').textContent = f.name;
+  document.getElementById('renameInput').value = base;
+  document.getElementById('extCustom').value   = ext;
+  document.getElementById('renameErr').textContent = '';
+  const extList = document.getElementById('extList');
+  extList.innerHTML = COMMON_EXTS.map(e=>
+    `<span class="ext-chip${e===ext?' on':''}" onclick="selectExt('${e}')">${e}</span>`
+  ).join('');
+  openModal('renameModal');
+  setTimeout(()=>document.getElementById('renameInput')?.focus(),80);
+}
+function selectExt(ext, customVal) {
+  if (customVal!==undefined) {
+    _renameChosenExt = customVal.startsWith('.')?customVal:(customVal?'.'+customVal:'');
+  } else {
+    _renameChosenExt = ext;
+    document.getElementById('extCustom').value = ext;
+  }
+  document.querySelectorAll('.ext-chip').forEach(c=>c.classList.toggle('on',c.textContent===_renameChosenExt));
+}
+async function doRename() {
+  const errEl = document.getElementById('renameErr');
+  const base  = document.getElementById('renameInput')?.value.trim();
+  if (!base) { if(errEl) errEl.textContent='Enter a name'; return; }
+  const newName = base+(_renameChosenExt||'');
+  const f = _lockerFiles.find(x=>x.id===_renameTargetId);
+  if (!f) return;
+  if (newName===f.name) { closeModal('renameModal'); return; }
+  try {
+    const {db,doc,setDoc} = window._dartFS;
+    await setDoc(doc(db,'transfers',window._fbUser.uid,'files',f.id),{name:newName},{merge:true});
+    if (f.isPublic) await setDoc(doc(db,'public_files',f.id),{fileName:newName},{merge:true});
+    f.name = newName;
+    renderLockerGrid();
+    _notify('Renamed to "'+newName+'"','s');
+    closeModal('renameModal');
+  } catch(e) { if(errEl) errEl.textContent='Error: '+e.message; }
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
+function openPreviewModal(id, e) {
+  e?.stopPropagation();
+  const f = _lockerFiles.find(x=>x.id===id);
+  if (!f?.downloadURL) { _notify('No preview available','i'); return; }
+  const ext  = (f.name||'').split('.').pop().toLowerCase();
+  const inner = document.getElementById('previewInner');
+  const title = document.getElementById('previewTitle');
+  const dlBtn = document.getElementById('previewDlBtn');
+  if (title) title.textContent = f.name||'Preview';
+  if (dlBtn) dlBtn.onclick = ()=>parallelDownload(f.downloadURL,f.name,f.size||0);
+  if (!inner) return;
+
+  const imgs  = ['jpg','jpeg','png','gif','webp','svg','bmp'];
+  const vids  = ['mp4','webm','mov','ogg'];
+  const auds  = ['mp3','wav','ogg','flac','aac','m4a'];
+  const texts = ['txt','md','json','csv','xml','html','css','js','ts','py','java','sh','log','yaml','yml'];
+
+  if (imgs.includes(ext)) {
+    inner.innerHTML = `<img src="${f.downloadURL}" alt="${f.name}" style="max-width:100%;max-height:55vh;object-fit:contain">`;
+  } else if (vids.includes(ext)) {
+    inner.innerHTML = `<video controls src="${f.downloadURL}" style="max-width:100%;max-height:55vh"></video>`;
+  } else if (auds.includes(ext)) {
+    inner.innerHTML = `<audio controls src="${f.downloadURL}" style="width:100%;padding:20px"></audio>`;
+  } else if (ext==='pdf') {
+    inner.innerHTML = `<iframe src="${f.downloadURL}" style="width:100%;height:55vh;border:none"></iframe>`;
+  } else if (texts.includes(ext)) {
+    inner.innerHTML = '<pre style="color:var(--mu);padding:20px;font-size:.5rem">Loading text...</pre>';
+    fetch(f.downloadURL, { mode: 'cors' })
+      .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+      .then(t=>{
+        inner.innerHTML = `<pre style="padding:14px;font-size:.48rem;color:var(--tx);overflow:auto;max-height:55vh;white-space:pre-wrap;word-break:break-all">${esc(t.slice(0,50000))}</pre>`;
+      }).catch(err=>{
+        inner.innerHTML=`<div style="padding:20px;text-align:center">
+          <div style="color:var(--d3);font-size:.5rem;margin-bottom:10px">Preview unavailable (${esc(err.message)})</div>
+          <a href="${esc(f.downloadURL)}" target="_blank" rel="noopener" style="color:var(--d5);font-size:.48rem">Open in new tab ↗</a>
+        </div>`;
+      });
+  } else {
+    inner.innerHTML = `<div style="padding:40px;text-align:center;color:var(--mu)">
+      <div style="font-size:3rem;margin-bottom:12px">${fileIcon(f.name)}</div>
+      <div style="font-size:.54rem">${f.name}</div>
+      <div style="font-size:.48rem;margin-top:6px">${fmtBytes(f.size||0)}</div>
+      <div style="font-size:.44rem;color:var(--dm);margin-top:10px">No preview for .${ext} files</div>
+    </div>`;
+  }
+  openModal('previewModal');
+  FB.logActivity?.(id,'preview');
+}
+
+// ── Comments ──────────────────────────────────────────────────────────────────
+let _commentsFileId = null, _commentsUnsub = null;
+function openCommentsModal(id) {
+  _commentsFileId = id;
+  const f = _lockerFiles.find(x=>x.id===id)||{name:'Unknown'};
+  document.getElementById('commentsModalName').textContent = f.name;
+  document.getElementById('commentInput').value = '';
+  _commentsUnsub?.();
+  _loadComments(id);
+  openModal('commentsModal');
+}
+function _loadComments(id) {
+  if (!window._dartFS) return;
+  const {db,collection,query,orderBy,onSnapshot} = window._dartFS;
+  const q = query(collection(db,'file_comments',id,'msgs'), orderBy('ts','asc'));
+  _commentsUnsub = onSnapshot(q, snap=>{
+    const el = document.getElementById('commentList');
+    if (!el) return;
+    const items = snap.docs.map(d=>d.data());
+    el.innerHTML = items.length ? items.map(c=>`
+      <div class="comment-item">
+        <div class="comment-author">${esc(c.email||'Unknown')}</div>
+        <div class="comment-text">${esc(c.text||'')}</div>
+        <div class="comment-ts">${c.ts?.seconds?new Date(c.ts.seconds*1000).toLocaleString():''}</div>
+      </div>`).join('') : '<div style="font-size:.5rem;color:var(--mu);padding:10px 0">No comments yet</div>';
+    el.scrollTop = el.scrollHeight;
+  },()=>{});
+}
+let _commentPosting = false;
+async function postComment() {
+  if (_commentPosting) return;
+  const input = document.getElementById('commentInput');
+  const text  = input?.value.trim();
+  if (!text || text.length > 2000) return;
+  const user = window._fbUser;
+  if (!user) return;
+  _commentPosting = true;
+  try {
+    const {db,collection,addDoc,serverTimestamp} = window._dartFS;
+    await addDoc(collection(db,'file_comments',_commentsFileId,'msgs'),{
+      uid:user.uid, email:user.email||'', text, ts:serverTimestamp()
+    });
+    input.value = '';
+  } finally {
+    setTimeout(()=>{ _commentPosting=false; }, 1000); // 1s debounce
+  }
+}
+
+// ── Share ─────────────────────────────────────────────────────────────────────
+let _shareTargetId = null;
+let _sharesUnsub = null;
+function openShareModal(id) {
+  _shareTargetId = id;
+  const f = _lockerFiles.find(x=>x.id===id)||{name:id};
+  document.getElementById('shareModalName').textContent = f.name;
+  document.getElementById('shareEmail').value = '';
+  document.getElementById('shareErr').textContent = '';
+  document.getElementById('shareBtn').textContent = 'Share';
+  document.getElementById('shareBtn').disabled = false;
+  openModal('shareModal');
+  setTimeout(()=>document.getElementById('shareEmail')?.focus(),80);
+  
+  // Dynamically add existingShares div if it doesn't exist
+  let el = document.getElementById('existingShares');
+  if (!el) {
+    const modal = document.querySelector('#shareModal .modal');
+    if (modal) {
+      const errDiv = document.getElementById('shareErr');
+      const rowDiv = modal.querySelector('.modal-row');
+      if (errDiv && rowDiv) {
+        el = document.createElement('div');
+        el.id = 'existingShares';
+        el.style.marginTop = '16px';
+        el.style.paddingTop = '16px';
+        el.style.borderTop = '1px solid var(--b)';
+        modal.insertBefore(el, rowDiv);
+      }
+    }
+  }
+  
+  loadExistingShares(id);
+}
+async function loadExistingShares(fileId) {
+  const user = window._fbUser;
+  if (!user?.uid) return;
+  const el = document.getElementById('existingShares');
+  _sharesUnsub?.();
+  const f = _lockerFiles.find(x=>x.id===fileId);
+  if (!f?.name) return;
+  const {db,collection,query,where,onSnapshot} = window._dartFS;
+  const q = query(collection(db,'shares'),where('ownerUid','==',user.uid));
+  _sharesUnsub = onSnapshot(q, snap=>{
+    const shares = snap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>s.fileName===f.name);
+    renderExistingShares(shares);
+  },()=>{});
+}
+function renderExistingShares(shares) {
+  const el = document.getElementById('existingShares');
+  if (!el) return;
+  console.log('[renderExistingShares] Called with shares:', shares);
+  if (!shares.length){
+    el.innerHTML = '<div style="font-size:.42rem;color:var(--mu);margin-top:16px">No shares yet</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div style="font-size:.42rem;color:var(--mu);margin-bottom:8px">Shared with:</div>
+    ${shares.map(s=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--b)">
+        <span style="font-size:.44rem">${esc(s.recipientEmail)}</span>
+        <button class="lk-btn" onclick="unshareFile('${s.id}','${escAttr(s.recipientEmail)}')" style="color:var(--d5)">✕ Unshare</button>
+      </div>
+    `).join('')}
+  `;
+}
+async function unshareFile(shareId, email) {
+  const user = window._fbUser;
+  if (!user?.uid) return;
+  const {db,doc,deleteDoc} = window._dartFS;
+  try {
+    await deleteDoc(doc(db,'shares',shareId));
+    _notify('Unshared from '+email,'s');
+  } catch(e){ _notify('Unshare failed: '+e.message,'e'); }
+}
+async function doShare() {
+  const email = document.getElementById('shareEmail')?.value.trim().toLowerCase();
+  const errEl = document.getElementById('shareErr');
+  const btn   = document.getElementById('shareBtn');
+  errEl.textContent = '';
+  if (!email||!email.includes('@')){ errEl.textContent='Enter a valid email'; return; }
+  const user = window._fbUser;
+  if (!user){ errEl.textContent='Not signed in'; return; }
+  if (email===user.email?.toLowerCase()){ errEl.textContent="That's your own email"; return; }
+  const f = _lockerFiles.find(x=>x.id===_shareTargetId);
+  if (!f?.downloadURL){ errEl.textContent='File not ready'; return; }
+  btn.textContent='Sharing...'; btn.disabled=true;
+  try {
+    const {db,collection,addDoc,serverTimestamp} = window._dartFS;
+    await addDoc(collection(db,'shares'),{
+      ownerUid:user.uid, ownerEmail:user.email||'', ownerName:user.displayName||user.email||'',
+      recipientEmail:email, fileName:f.name, filePath:f.filePath,
+      downloadURL:f.downloadURL, fileSize:f.size||0, ts:serverTimestamp()
+    });
+    FB.logActivity?.(f.id,'share:'+email);
+    btn.textContent='✓ Shared!';
+    _notify('Shared "'+f.name+'" with '+email,'s');
+    document.getElementById('shareEmail').value = '';
+    btn.textContent='Share'; btn.disabled=false;
+    loadExistingShares(_shareTargetId);
+  } catch(e){ errEl.textContent='Share failed: '+e.message; btn.textContent='Share'; btn.disabled=false; }
+}
+
+// ── Shared with me ────────────────────────────────────────────────────────────
+let _swmUnsub = null;
+async function loadSharedWithMe() {
+  const user = window._fbUser;
+  if (!user?.email) return;
+  const el = document.getElementById('swmList');
+  if (el) el.innerHTML = '<div class="lk-empty" style="padding:16px 0">Loading...</div>';
+  _swmUnsub?.();
+  const {db,collection,query,where,orderBy,onSnapshot} = window._dartFS;
+  const q = query(collection(db,'shares'),where('recipientEmail','==',user.email.toLowerCase()),orderBy('ts','desc'));
+  _swmUnsub = onSnapshot(q, snap=>{
+    const shares = snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderSWM(shares);
+  },()=>{});
+}
+function renderSWM(shares) {
+  const el = document.getElementById('swmList');
+  if (!el) return;
+  if (!shares.length){ el.innerHTML='<div class="lk-empty" style="padding:16px 0">No files shared with you yet</div>'; return; }
+  el.innerHTML = shares.map(s=>`
+    <div class="swm-row">
+      <div>
+        <div class="swm-name" title="${esc(s.fileName||'')}">${esc(s.fileName||'Unnamed')}</div>
+        <div class="swm-from">from ${esc(s.ownerName||s.ownerEmail||'Unknown')}</div>
+      </div>
+      <span class="swm-size">${fmtBytes(s.fileSize||0)}</span>
+      <button class="lk-btn dl" onclick="parallelDownload('${escAttr(s.downloadURL||'')}','${escAttr(s.fileName||'')}',${s.fileSize||0})">↓</button>
+      <button class="lk-btn" onclick="navigator.clipboard.writeText('${escAttr(s.downloadURL||'')}').then(()=>_notify('Link copied','s'))">⎘</button>
+    </div>`).join('');
+}
+
+// ── Publish ───────────────────────────────────────────────────────────────────
+async function togglePublic(id, makePublic) {
+  const f = _lockerFiles.find(x=>x.id===id);
+  if (!f) return;
+  const user = window._fbUser;
+  const {db,doc,setDoc,deleteDoc,serverTimestamp} = window._dartFS;
+  try {
+    if (makePublic) {
+      await setDoc(doc(db,'public_files',id),{
+        ownerUid:user.uid, ownerEmail:user.email||'', ownerName:user.displayName||user.email||'',
+        fileName:f.name, filePath:f.filePath, downloadURL:f.downloadURL, fileSize:f.size||0,
+        ts:serverTimestamp()
+      });
+      await setDoc(doc(db,'transfers',user.uid,'files',id),{isPublic:true},{merge:true});
+      f.isPublic = true; _notify('"'+f.name+'" is now public','s');
+    } else {
+      await deleteDoc(doc(db,'public_files',id));
+      await setDoc(doc(db,'transfers',user.uid,'files',id),{isPublic:false},{merge:true});
+      f.isPublic = false; _notify('"'+f.name+'" is now private','i');
+    }
+    renderLockerGrid();
+    if (document.getElementById('lkPublic')?.classList.contains('on')) loadPublicFiles();
+  } catch(e){ _notify('Error: '+e.message,'e'); }
+}
+
+// ── Public / community tab ────────────────────────────────────────────────────
+let _pubFiles=[],_pubShown=[],_pubUnsub=null,_pubViewUid=null;
+async function loadPublicFiles() {
+  if (!window._dartFS) return;
+  _pubUnsub?.();
+  const {db,collection,query,orderBy,limit,onSnapshot} = window._dartFS;
+  const q = query(collection(db,'public_files'),orderBy('ts','desc'),limit(500));
+  _pubUnsub = onSnapshot(q, snap=>{
+    _pubFiles = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if (_pubViewUid) filterPublic(); else renderUserCards();
+  },()=>{});
+}
+function renderUserCards() {
+  const grid = document.getElementById('pubUserGrid');
+  if (!grid) return;
+  const byUser={};
+  for (const f of _pubFiles) {
+    const uid=f.ownerUid;
+    if (!byUser[uid]) byUser[uid]={uid,name:f.ownerName||f.ownerEmail||'Unknown',files:[]};
+    byUser[uid].files.push(f);
+  }
+  const users = Object.values(byUser);
+  if (!users.length){ grid.innerHTML='<div class="lk-empty">No public files yet</div>'; return; }
+  const me = window._fbUser?.uid;
+  users.sort((a,b)=>{ if(a.uid===me)return -1; if(b.uid===me)return 1; return b.files.length-a.files.length; });
+  grid.innerHTML = users.map(u=>{
+    const initial=esc((u.name||'?')[0].toUpperCase());
+    const size=u.files.reduce((s,f)=>s+(f.fileSize||0),0);
+    const uuid=escAttr(u.uid), uname=escAttr(u.name||'');
+    return `<div class="user-card" onclick="openUserFiles('${uuid}','${uname}')">
+      <div class="user-avatar">${initial}</div>
+      <div class="user-card-name">${u.uid===me?'You':esc(u.name)}</div>
+      <div class="user-card-count">${u.files.length} file${u.files.length!==1?'s':''}</div>
+      <div class="user-card-meta">${fmtBytes(size)}</div>
+    </div>`;
+  }).join('');
+}
+function openUserFiles(uid, name) {
+  _pubViewUid = uid;
+  document.getElementById('pubUsers').style.display='none';
+  document.getElementById('pubUserFiles').style.display='';
+  document.getElementById('pubUserName').textContent = uid===window._fbUser?.uid?'Your public files':name+"'s files";
+  filterPublic();
+}
+function backToUsers() {
+  _pubViewUid=null;
+  document.getElementById('pubUsers').style.display='';
+  document.getElementById('pubUserFiles').style.display='none';
+  renderUserCards();
+}
+function filterPublic() {
+  if (!_pubViewUid){ renderUserCards(); return; }
+  const q    = (document.getElementById('pubSearch')?.value||'').toLowerCase();
+  const sort = document.getElementById('pubSort')?.value||'date-desc';
+  let list = _pubFiles.filter(f=>f.ownerUid===_pubViewUid);
+  if (q) list=list.filter(f=>(f.fileName||'').toLowerCase().includes(q));
+  list.sort((a,b)=>{
+    if(sort==='name-asc') return (a.fileName||'').localeCompare(b.fileName||'');
+    if(sort==='size-desc') return (b.fileSize||0)-(a.fileSize||0);
+    return (b.ts?.seconds||0)-(a.ts?.seconds||0);
+  });
+  _pubShown=list; renderPublicGrid();
+}
+function renderPublicGrid() {
+  const grid=document.getElementById('pubGrid');
+  if(!grid) return;
+  if(!_pubShown.length){ grid.innerHTML='<div class="lk-empty">No public files</div>'; return; }
+  const me=window._fbUser?.uid;
+  grid.innerHTML=_pubShown.map(f=>{
+    const ext=esc((f.fileName||'').split('.').pop()?.toUpperCase().slice(0,6)||'FILE');
+    const isOwn=f.ownerUid===me;
+    const pfid=escAttr(f.id), purl=escAttr(f.downloadURL||''), pfname=escAttr(f.fileName||'');
+    return `<div class="pub-card">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+        <span style="font-size:1rem">${fileIcon(f.fileName)}</span>
+        <span class="lk-ext">${ext}</span>
+      </div>
+      <div class="lk-name" title="${esc(f.fileName||'')}">${esc(f.fileName||'Unnamed')}</div>
+      <div class="pub-owner">by ${isOwn?'you':esc(f.ownerName||f.ownerEmail||'Unknown')}</div>
+      <div class="lk-meta"><span>${fmtBytes(f.fileSize||0)}</span><span>${fmtDate(f.ts)}</span></div>
+      <div class="lk-actions">
+        <button class="lk-btn dl" onclick="parallelDownload('${purl}','${pfname}',${f.fileSize||0});FB.logActivity?.('${pfid}','download')">↓ Download</button>
+        <button class="lk-btn" onclick="navigator.clipboard.writeText('${purl}').then(()=>_notify('Copied','s'))">⎘</button>
+        <button class="lk-btn" onclick="openCommentsModal_pub('${pfid}','${pfname}')">💬</button>
+        ${isOwn?`<button class="lk-btn unpub" onclick="togglePublic('${pfid}',false)">⊘ Unpublish</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+function openCommentsModal_pub(id, name) {
+  _commentsFileId = id;
+  document.getElementById('commentsModalName').textContent = name;
+  document.getElementById('commentInput').value='';
+  _commentsUnsub?.();
+  _loadComments(id);
+  openModal('commentsModal');
+}
+
+// ── Activity log ──────────────────────────────────────────────────────────────
+let _actUnsub = null;
+async function loadActivityLog() {
+  const user = window._fbUser;
+  if (!user || !window._dartFS) return;
+  const el = document.getElementById('activityList');
+  // Load activity for all files owned by user where action=download or share
+  // We query a global activity index
+  const {db,collection,query,where,orderBy,limit,onSnapshot} = window._dartFS;
+  try {
+    const q = query(collection(db,'activity_index'),where('ownerUid','==',user.uid),orderBy('ts','desc'),limit(100));
+    _actUnsub?.();
+    _actUnsub = onSnapshot(q, snap=>{
+      const items = snap.docs.map(d=>d.data());
+      if (!items.length){ if(el) el.innerHTML='<div class="lk-empty" style="padding:16px 0">No activity yet</div>'; return; }
+      if (el) el.innerHTML = items.map(a=>`
+        <div class="activity-item">
+          <div>
+            <div class="activity-who">${esc(a.email||'Someone')}</div>
+            <div class="activity-action">${a.action==='download'?'↓ downloaded':'⟁ shared'} &ldquo;${esc(a.fileName||'')}&rdquo;</div>
+          </div>
+          <div class="activity-when">${fmtDateFull(a.ts)}</div>
+        </div>`).join('');
+    },()=>{ if(el) el.innerHTML='<div class="lk-empty" style="padding:16px 0">Activity unavailable</div>'; });
+  } catch {}
+}
+
+// ── Zip ───────────────────────────────────────────────────────────────────────
+let _zipTargetIds = [];
+function openZipModal(ids) {
+  _zipTargetIds = ids || [..._lockerSel].filter(id=>!id.startsWith('folder:'));
+  if (!_zipTargetIds.length) return;
+  const files = _lockerFiles.filter(f=>_zipTargetIds.includes(f.id));
+  document.getElementById('zipName').value = 'archive.zip';
+  document.getElementById('zipPassword').value = '';
+  document.getElementById('zipErr').textContent = '';
+  document.getElementById('zipBtn').disabled = false;
+  document.getElementById('zipBtn').textContent = '⬡ Create Zip';
+  document.getElementById('zipPublish').checked = false;
+  const list = document.getElementById('zipFileList');
+  list.innerHTML = files.map(f=>`
+    <div class="zip-file-item">
+      <span>${fileIcon(f.name)}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
+      <span style="color:var(--mu)">${fmtBytes(f.size||0)}</span>
+    </div>`).join('');
+  openModal('zipModal');
+}
+async function doZip() {
+  const zipName  = document.getElementById('zipName')?.value.trim()||'archive.zip';
+  const password = document.getElementById('zipPassword')?.value||'';
+  const publish  = document.getElementById('zipPublish')?.checked;
+  const btn      = document.getElementById('zipBtn');
+  const errEl    = document.getElementById('zipErr');
+  errEl.textContent=''; btn.disabled=true; btn.textContent='Fetching files...';
+
+  const files = _lockerFiles.filter(f=>_zipTargetIds.includes(f.id)&&f.downloadURL);
+  if (!files.length){ errEl.textContent='No files to zip'; btn.disabled=false; return; }
+
+  try {
+    // Fetch all file blobs in parallel
+    btn.textContent='Downloading files...';
+    const blobResults = await Promise.allSettled(files.map(async f=>{
+      const res = await fetch(f.downloadURL);
+      if (!res.ok) throw new Error('HTTP '+res.status+' for '+f.name);
+      return { name:f.name, blob:await res.blob(), size:f.size||0 };
+    }));
+    const failed = blobResults.filter(r=>r.status==='rejected');
+    if (failed.length) _notify(failed.length+' file(s) could not be fetched — skipped','i');
+    const blobs = blobResults.filter(r=>r.status==='fulfilled').map(r=>r.value);
+    if (!blobs.length) { errEl.textContent='No files could be fetched'; btn.disabled=false; return; }
+
+    btn.textContent='Building zip...';
+
+    // Use fflate (loaded from CDN) for zip creation with optional password
+    const fflate = await import('https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js'); // pin to 0.8.2
+
+    // AES-256-GCM encryption helper (Web Crypto API)
+    async function aesEncrypt(data, password) {
+      const enc     = new TextEncoder();
+      const keyMat  = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+      const salt    = crypto.getRandomValues(new Uint8Array(16));
+      const key     = await crypto.subtle.deriveKey(
+        { name:'PBKDF2', salt, iterations:100000, hash:'SHA-256' },
+        keyMat, { name:'AES-GCM', length:256 }, false, ['encrypt']
+      );
+      const iv      = crypto.getRandomValues(new Uint8Array(12));
+      const enc_buf = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, data);
+      // Prepend salt(16) + iv(12) + ciphertext
+      const out = new Uint8Array(16 + 12 + enc_buf.byteLength);
+      out.set(salt, 0); out.set(iv, 16); out.set(new Uint8Array(enc_buf), 28);
+      return out;
+    }
+
+    const zipData = {};
+    for (const b of blobs) {
+      let arr = new Uint8Array(await b.blob.arrayBuffer());
+      const entryName = password ? b.name + '.enc' : b.name;
+      if (password) {
+        arr = await aesEncrypt(arr, password);
+        zipData[entryName] = [arr, { level: 0 }]; // no double-compress encrypted data
+      } else {
+        zipData[entryName] = [arr, { level: 6 }];
+      }
+    }
+    if (password) {
+      // Add a manifest so recipient knows how to decrypt
+      const manifest = JSON.stringify({ encrypted: true, algo: 'AES-256-GCM', version: 1,
+        files: blobs.map(b=>b.name), hint: 'Each .enc file: 16B salt + 12B IV + ciphertext' });
+      zipData['_DART_MANIFEST.json'] = [new TextEncoder().encode(manifest), { level: 0 }];
+    }
+
+    const zipped = await new Promise((resolve, reject) => {
+      fflate.zip(zipData, (err, data) => {
+        if (err) reject(err); else resolve(data);
+      });
+    });
+
+    const zipBlob = new Blob([zipped], { type: 'application/zip' });
+    const url     = URL.createObjectURL(zipBlob);
+    const a       = document.createElement('a');
+    a.href=url; a.download=zipName.endsWith('.zip')?zipName:zipName+'.zip';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+
+    if (publish) {
+      btn.textContent='Uploading zip...';
+      const zipFile = new File([zipBlob], a.download, { type:'application/zip' });
+      await FB.upload(zipFile, {
+        onComplete: ()=>_notify('Zip published','s'),
+      });
+    }
+
+    btn.textContent='✓ Done!';
+    _notify('Zip created: '+a.download, 's');
+    setTimeout(()=>closeModal('zipModal'), 1200);
+  } catch(e) {
+    errEl.textContent = 'Zip failed: '+e.message;
+    btn.disabled=false; btn.textContent='⬡ Create Zip';
+  }
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────────
+function switchLockerTab(id, btn) {
+  document.querySelectorAll('.lk-pane').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.lk-tab').forEach(b=>b.classList.remove('on'));
+  document.getElementById(id)?.classList.add('on');
+  btn.classList.add('on');
+  if (id==='lkShared') loadSharedWithMe();
+  if (id==='lkPublic') {
+    _pubViewUid=null;
+    document.getElementById('pubUsers').style.display='';
+    document.getElementById('pubUserFiles').style.display='none';
+    loadPublicFiles();
+  }
+  if (id==='lkActivity') loadActivityLog();
+}
+
+// ── Workspace ─────────────────────────────────────────────────────────────────
+let _wsItems = new Set(); // file IDs in workspace
+function openWorkspace() {
+  const ws = document.getElementById('wsPanel');
+  if (ws) ws.classList.add('show');
+  renderWSSidebar(); renderWSCanvas();
+}
+function closeWorkspace() { document.getElementById('wsPanel')?.classList.remove('show'); }
+function clearWorkspace() { _wsItems.clear(); renderWSCanvas(); renderWSSidebar(); }
+
+function renderWSSidebar() {
+  const el = document.getElementById('wsSidebar');
+  if (!el) return;
+  el.innerHTML = _lockerFiles.map(f=>`
+    <div class="ws-item${_wsItems.has(f.id)?' in-ws':''}"
+      onclick="toggleWsItem('${escAttr(f.id)}')">
+      <span>${fileIcon(f.name)}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.46rem">${esc(f.name)}</span>
+      ${_wsItems.has(f.id)?'<span style="color:var(--d);font-size:.7rem">✓</span>':''}
+    </div>`).join('')||'<div style="font-size:.46rem;color:var(--mu)">No files yet</div>';
+}
+function renderWSCanvas() {
+  const canvas = document.getElementById('wsCanvas');
+  const empty  = document.getElementById('wsCanvasEmpty');
+  const count  = document.getElementById('wsCount');
+  if (!canvas) return;
+  const items = _lockerFiles.filter(f=>_wsItems.has(f.id));
+  if (empty) empty.style.display = items.length?'none':'';
+  if (count) count.textContent = items.length?items.length+' file'+(items.length!==1?'s':''):'';
+  const nodes = canvas.querySelectorAll('.ws-node');
+  nodes.forEach(n=>n.remove());
+  items.forEach(f=>{
+    const node = document.createElement('div');
+    node.className='ws-node';
+    node.draggable=true;
+    node.innerHTML = `<span class="ws-node-icon">${fileIcon(f.name)}</span>
+      <span class="ws-node-name" title="${esc(f.name)}">${esc(f.name)}</span>
+      <span style="font-size:.42rem;color:var(--mu)">${fmtBytes(f.size||0)}</span>
+      <span class="ws-node-rm" onclick="removeWsItem('${escAttr(f.id)}')" title="Remove">✕</span>`;
+    canvas.appendChild(node);
+  });
+}
+function toggleWsItem(id) {
+  if (_wsItems.has(id)) _wsItems.delete(id); else _wsItems.add(id);
+  renderWSSidebar(); renderWSCanvas();
+}
+function removeWsItem(id) {
+  _wsItems.delete(id);
+  renderWSSidebar(); renderWSCanvas();
+}
+function wsDownloadAll() {
+  const items = _lockerFiles.filter(f=>_wsItems.has(f.id)&&f.downloadURL&&f.downloadURL.startsWith('https://'));
+  items.forEach((f,i)=>setTimeout(()=>parallelDownload(f.downloadURL,f.name,f.size||0),i*350));
+}
+function wsZipAll() {
+  const ids = [..._wsItems];
+  if (!ids.length){ _notify('No files in workspace','e'); return; }
+  openZipModal(ids);
+}
+function wsShareAll() {
+  const items = _lockerFiles.filter(f=>_wsItems.has(f.id));
+  if (!items.length){ _notify('No files in workspace','e'); return; }
+  document.getElementById('wsShareDesc').textContent = `Sharing ${items.length} file${items.length!==1?'s':''} from workspace`;
+  document.getElementById('wsShareEmail').value='';
+  document.getElementById('wsShareErr').textContent='';
+  openModal('wsShareModal');
+  setTimeout(()=>document.getElementById('wsShareEmail')?.focus(),80);
+}
+async function doWsShare() {
+  const email = document.getElementById('wsShareEmail')?.value.trim().toLowerCase();
+  const errEl = document.getElementById('wsShareErr');
+  errEl.textContent='';
+  if (!email||!email.includes('@')){ errEl.textContent='Enter a valid email'; return; }
+  const user = window._fbUser;
+  const items = _lockerFiles.filter(f=>_wsItems.has(f.id)&&f.downloadURL&&f.downloadURL.startsWith('https://'));
+  const {db,collection,addDoc,serverTimestamp} = window._dartFS;
+  try {
+    for (const f of items) {
+      await addDoc(collection(db,'shares'),{
+        ownerUid:user.uid, ownerEmail:user.email||'', ownerName:user.displayName||'',
+        recipientEmail:email, fileName:f.name, filePath:f.filePath,
+        downloadURL:f.downloadURL, fileSize:f.size||0, ts:serverTimestamp()
+      });
+    }
+    _notify(`Shared ${items.length} file${items.length>1?'s':''} with ${email}`,'s');
+    closeModal('wsShareModal');
+  } catch(e){ errEl.textContent='Error: '+e.message; }
+}
+
+// ── Parallel download ────────────────────────────────────────────────────────
+async function parallelDownload(url, fileName, fileSize) {
+  const parallel=4, chunkSize=4*1024*1024;
+  if (!fileSize || fileSize < chunkSize*2) {
+    const a=document.createElement('a');
+    a.href=url; a.download=fileName||'file'; a.target='_blank';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); return;
+  }
+  try {
+    const probe = await fetch(url,{method:'HEAD'}).catch(()=>null);
+    if (!probe?.headers.get('Accept-Ranges')?.includes('bytes')) throw new Error('no ranges');
+  } catch { window.open(url,'_blank'); return; }
+  _notify(`↓ Downloading "${fileName}" (${parallel} streams)...`,'i');
+  const totalChunks = Math.ceil(fileSize/chunkSize);
+  const chunks = new Array(totalChunks);
+  let downloaded=0;
+  const t0=performance.now();
+  async function fetchChunk(i) {
+    const start=i*chunkSize, end=Math.min(start+chunkSize-1,fileSize-1);
+    const res=await fetch(url,{headers:{Range:`bytes=${start}-${end}`}});
+    if (!res.ok&&res.status!==206) throw new Error('Range '+res.status);
+    const buf=await res.arrayBuffer();
+    chunks[i]=buf; downloaded+=buf.byteLength;
+  }
+  const queue=Array.from({length:totalChunks},(_,i)=>i);
+  async function worker(){ while(queue.length) await fetchChunk(queue.shift()); }
+  try {
+    await Promise.all(Array.from({length:parallel},worker));
+    const total=chunks.reduce((s,c)=>s+c.byteLength,0);
+    const out=new Uint8Array(total);
+    let off=0;
+    for (const c of chunks){ out.set(new Uint8Array(c),off); off+=c.byteLength; }
+    const blob=new Blob([out]);
+    const burl=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=burl; a.download=fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(burl),10000);
+    _notify('✓ Downloaded "'+fileName+'"','s');
+  } catch(e) {
+    _notify('Parallel download failed ('+e.message+') — opening direct link','i');
+    window.open(url,'_blank');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  UPLOAD QUEUE
+// ════════════════════════════════════════════════════════════════════════════
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dz')?.classList.remove('drag');
+  const items=[...e.dataTransfer.items||[]];
+  const entries=items.map(i=>i.webkitGetAsEntry?.()).filter(Boolean);
+  if (entries.length) traverseEntries(entries);
+  else addFiles([...e.dataTransfer.files]);
+}
+async function traverseEntries(entries) {
+  const files=[];
+  async function walk(entry, path='') {
+    if (entry.isFile) {
+      await new Promise(res=>entry.file(f=>{
+        Object.defineProperty(f,'_path',{value:path,writable:true});
+        files.push(f); res();
+      }));
+    } else if (entry.isDirectory) {
+      const reader=entry.createReader();
+      // readEntries batches max 100 — must call repeatedly until it returns empty array
+      const readAll = () => new Promise(res=>reader.readEntries(async ents=>{
+        if (!ents.length) { res(); return; }
+        const subPath = path?path+'/'+entry.name:entry.name;
+        for (const e of ents) await walk(e, subPath);
+        res(readAll());
+      }));
+      await readAll();
+    }
+  }
+  for (const e of entries) await walk(e);
+  addFiles(files);
+}
+function addFiles(files) {
+  if (!files.length) return;
+  for (const f of files) {
+    if (S.queue.find(i=>i.file.name===f.name&&i.file.size===f.size)) continue;
+    const item={file:f,status:'queued',progress:0,speed:0,_path:f._path||''};
+    S.queue.push(item);
+    buildQueueItem(item);
+  }
+  updateControls();
+}
+function buildQueueItem(item) {
+  const q  = document.getElementById('queue');
+  if (!q) return;
+  const el = document.createElement('div');
+  el.className='qi';
+  const idx=S.queue.indexOf(item)+1;
+  el.innerHTML=`<div class="qi-num">${idx}</div>
+    <div><div class="qi-name" title="${item.file.name}">${fileIcon(item.file.name)} ${item.file.name}</div>
+    <div class="qi-bar"><div class="qi-fill" style="width:0%"></div></div></div>
+    <div><div class="qi-pct">0%</div><div class="qi-spd">${fmtBytes(item.file.size)}</div></div>
+    <div class="bd">Queued</div>`;
+  q.appendChild(el);
+  item._el=el; item._elBar=el.querySelector('.qi-fill');
+  item._elPct=el.querySelector('.qi-pct'); item._elSpd=el.querySelector('.qi-spd');
+  item._elBadge=el.querySelector('.bd');
+}
+function clearQueue() {
+  S.queue=[];
+  const q=document.getElementById('queue'); if(q) q.innerHTML='';
+  updateControls();
+}
+async function runAll() {
+  if (S.running) return;
+  const user=window._fbUser;
+  if (!user&&window.FB_READY){ _notify('Sign in first','e'); return; }
+  S.running=true; S.paused=false;
+  updateControls(); startTicker();
+  const pending=S.queue.filter(i=>i.status==='queued');
+  pending.sort((a,b)=>a.file.size-b.file.size);
+  if (window.FB_READY&&user) {
+    await Promise.all(pending.map(item=>fbUpload(item)));
+  } else {
+    await Promise.all(pending.map(item=>demoUpload(item)));
+  }
+  stopTicker(); S.running=false; S.filesDone+=pending.length;
+  updateControls(); updateMetrics();
+  setBanner('ready','✓ '+pending.length+' file'+(pending.length>1?'s':'')+' uploaded');
+  _notify('✓ '+pending.length+' uploaded','s');
+}
+async function fbUpload(item) {
+  item.status='active'; setItemState(item,'active','Uploading');
+  try {
+    await FB.upload(item.file, {
+      folderPath: _currentFolder||'',
+      onProgress: (p,s)=>_updateItemProgress(item,p*100,s),
+      onComplete: r=>_finishItem(item,r),
+    });
+  } catch(err) {
+    item.status='error'; setItemState(item,'error','Error');
+    if(item._elSpd) item._elSpd.textContent=err.message.slice(0,18);
+    _notify('✗ '+item.file.name+': '+err.message,'e');
+  }
+}
+async function demoUpload(item) {
+  item.status='active'; setItemState(item,'active','Demo');
+  const target=1200+Math.random()*1200;
+  const sizeMB=item.file.size/1048576;
+  const durMs=Math.max(300,(sizeMB/target)*1000);
+  const t0=performance.now(); let smooth=target*0.3;
+  await new Promise(resolve=>{
+    function frame(){
+      if(S.paused){requestAnimationFrame(frame);return;}
+      const rawP=Math.min((performance.now()-t0)/durMs,1);
+      const raw=target*Math.min(1,rawP/0.03)*(0.95+Math.random()*0.10);
+      smooth=smooth*0.82+raw*0.18;
+      item.progress=rawP*100; item.speed=smooth; S.peakSpeed=Math.max(S.peakSpeed,smooth);
+      requestAnimationFrame(()=>{
+        if(item._elBar) item._elBar.style.width=item.progress.toFixed(1)+'%';
+        if(item._elPct) item._elPct.textContent=Math.round(item.progress)+'%';
+        if(item._elSpd) item._elSpd.textContent=fmtSpeed(smooth);
+      });
+      if(rawP<1) requestAnimationFrame(frame); else resolve();
+    }
+    requestAnimationFrame(frame);
+  });
+  item.status='done'; item.progress=100; item.speed=0; S.totalBytes+=item.file.size;
+  setItemState(item,'done','Done');
+  if(item._elSpd) item._elSpd.textContent='✓';
+  if(item._elBar) item._elBar.style.width='100%';
+}
+function _updateItemProgress(item,pct,speed) {
+  if(S.paused) return;
+  item.progress=pct; item.speed=speed; S.peakSpeed=Math.max(S.peakSpeed,speed);
+  requestAnimationFrame(()=>{
+    if(item._elBar) item._elBar.style.width=pct.toFixed(1)+'%';
+    if(item._elPct) item._elPct.textContent=Math.round(pct)+'%';
+    if(item._elSpd) item._elSpd.textContent=fmtSpeed(speed);
+  });
+}
+function _finishItem(item,result) {
+  S.totalBytes+=item.file.size;
+  item.status=result.deduped?'deduped':'done'; item.progress=100; item.speed=0;
+  if(result.deduped) S.deduped++;
+  requestAnimationFrame(()=>{
+    if(item._elBar)   item._elBar.style.width='100%';
+    if(item._elPct)   item._elPct.textContent='100%';
+    if(item._elSpd)   item._elSpd.textContent=result.deduped?'↑ cached':'✓';
+    if(item._elBadge){item._elBadge.className='bd '+(result.deduped?'deduped':'done');item._elBadge.textContent=result.deduped?'Cached':'Done';}
+    if(item._el)      item._el.className='qi done';
+  });
+}
+function setItemState(item,cls,txt){
+  if(item._el)      item._el.className='qi '+cls;
+  if(item._elBadge){item._elBadge.className='bd '+cls;item._elBadge.textContent=txt;}
+}
+function togglePause() {
+  S.paused=!S.paused;
+  document.getElementById('btnPause').textContent=S.paused?'▶ Resume':'⏸ Pause';
+}
+
+// ── Ticker ────────────────────────────────────────────────────────────────────
+function startTicker() {
+  tickerOn=true;
+  function tick(){
+    if(!tickerOn) return;
+    let rate=0;
+    S.queue.forEach(i=>{ if(i.status==='active') rate+=i.speed; });
+    const ms=document.getElementById('mSpeed');
+    if(ms) ms.textContent=rate>0?fmtSpeed(rate):'—';
+    const bw=document.getElementById('bwFill');
+    if(bw) bw.style.width=Math.min(100,(rate/12000)*100)+'%';
+    tickerRAF=requestAnimationFrame(tick);
+  }
+  tickerRAF=requestAnimationFrame(tick);
+}
+function stopTicker() {
+  tickerOn=false;
+  if(tickerRAF){cancelAnimationFrame(tickerRAF);tickerRAF=null;}
+  const bw=document.getElementById('bwFill'); if(bw) bw.style.width='0%';
+}
+function updateMetrics() {
+  const p=document.getElementById('mPeak'); if(p) p.textContent=fmtSpeed(S.peakSpeed);
+  const d=document.getElementById('mDone'); if(d) d.textContent=S.filesDone;
+  const b=document.getElementById('mBytes'); if(b) b.textContent=(S.totalBytes/1073741824).toFixed(2);
+  const dd=document.getElementById('mDedup'); if(dd) dd.textContent=S.deduped;
+}
+
+// ── Controls / Banner ─────────────────────────────────────────────────────────
+function updateControls() {
+  const hasQ=S.queue.some(i=>i.status==='queued');
+  const r=document.getElementById('btnRun'); if(r) r.disabled=!hasQ||S.running;
+  const p=document.getElementById('btnPause'); if(p) p.disabled=!S.running;
+}
+function setBanner(mode,txt) {
+  const bn=document.getElementById('bn');
+  if(bn){bn.className='bn '+mode;bn.textContent=txt;}
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+function runDemo() {
+  const demos=['project-report.pdf','design-assets.zip','video-edit.mp4','notes.txt','data-export.csv'];
+  addFiles(demos.map(n=>new File([new Uint8Array(Math.random()*50000000|0)],n)));
+  setTimeout(runAll,300);
+}
+
+// ── RTDB pane ─────────────────────────────────────────────────────────────────
+const _rtdbRows=new Map();
+function updateRTDBPane(data) {
+  const el=document.getElementById('rtdbPane'); if(!el) return;
+  const now=Date.now()/1000;
+  Object.entries(data).forEach(([id,v])=>{
+    if(v.status==='done'||(v.ts?.seconds&&now-v.ts.seconds>30)){_rtdbRows.delete(id);return;}
+    _rtdbRows.set(id,v);
+  });
+  if(!_rtdbRows.size){el.innerHTML='';return;}
+  el.innerHTML=[..._rtdbRows.values()].map(v=>`
+    <div class="rtdb-row">
+      <div class="rtdb-name">${esc(v.name||'')}</div>
+      <div class="rtdb-bar"><div class="rtdb-fill" style="width:${Math.round((v.progress||0)*100)}%"></div></div>
+      <div class="rtdb-meta"><span>${Math.round((v.progress||0)*100)}%</span><span>${v.speed?fmtSpeed(v.speed):''}</span></div>
+    </div>`).join('');
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    ['shareModal','renameModal','newFolderModal','moveModal','previewModal','commentsModal','zipModal','wsShareModal'].forEach(closeModal);
+  }
+});
+
+// ── DOM ready ─────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', ()=>{
+  Object.assign(M, Object.fromEntries(['mSpeed','mPeak','mDone','mBytes','mDedup','bwFill',
+    'fbDot','authLbl','authBtn','fileLocker','cfgNotice',
+    'badgeAuth','badgeStore','badgeFS','badgeRTDB'].map(id=>[id,document.getElementById(id)])));
+  if(!window.FB_READY&&M.cfgNotice) M.cfgNotice.classList.add('show');
+  const dz=document.getElementById('dz');
+  if(dz) dz.addEventListener('click',()=>document.getElementById('fi').click());
+});
+</script>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  INTEGRATION PANEL
+// ════════════════════════════════════════════════════════════════════════════
+
+function openIntegration() {
+  const p = document.getElementById('intPanel');
+  const isHidden = !p || p.style.display === 'none' || p.style.display === '';
+  if (!p) return;
+  p.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) {
+    renderSnippet();
+    renderSDK();
+    renderAPIDocs();
+    setTimeout(() => p.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+}
+
+function switchIntTab(id, btn) {
+  document.querySelectorAll('.int-pane').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.int-tab').forEach(b => b.classList.remove('on'));
+  document.getElementById(id)?.classList.add('on');
+  btn.classList.add('on');
+  if (id === 'intSnippet') renderSnippet();
+  if (id === 'intSDK')     renderSDK();
+  if (id === 'intAPI')     renderAPIDocs();
+}
+
+function copySnip(btn) { _copyCode('snipCode', btn); }
+function copySDK(btn)  { _copyCode('sdkCode',  btn); }
+function _copyCode(id, btn) {
+  const txt = document.getElementById(id)?.textContent || '';
+  navigator.clipboard.writeText(txt).then(() => {
+    btn.textContent = 'Copied!'; btn.classList.add('done');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 2000);
+  });
+}
+
+// ── Snippet generator ────────────────────────────────────────────────────────
+const SNIPPETS = {
+  vanilla: {
+    button: `<!-- 1. Add this script to your page -->
+<script src="https://studio-6794999112-ce5b1.web.app/dart-sdk.js"><\/script>
+
+<!-- 2. Add a button -->
+<input type="file" id="myFile" style="display:none">
+<button onclick="document.getElementById('myFile').click()">
+  Upload with DART
+</button>
+
+<!-- 3. Handle the upload -->
+<script>
+  const dart = new DartSDK({
+    firebaseConfig: { /* paste your firebase config here */ }
+  });
+
+  document.getElementById('myFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const result = await dart.upload(file, {
+      onProgress: (pct, speed) => console.log(pct + '% @ ' + speed + ' MB/s')
+    });
+
+    console.log('Done! Download URL:', result.downloadURL);
+  });
+<\/script>`,
+
+    dropzone: `<!-- Drop zone with DART -->
+<script src="https://studio-6794999112-ce5b1.web.app/dart-sdk.js"><\/script>
+
+<div id="drop" style="border:2px dashed #ccc;padding:40px;text-align:center">
+  Drop files here
+</div>
+
+<script>
+  const dart = new DartSDK({ firebaseConfig: { /* your config */ } });
+  const zone = document.getElementById('drop');
+
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = '#0f0'; });
+  zone.addEventListener('dragleave', () => zone.style.borderColor = '#ccc');
+  zone.addEventListener('drop', async e => {
+    e.preventDefault();
+    zone.style.borderColor = '#ccc';
+    for (const file of e.dataTransfer.files) {
+      const result = await dart.upload(file);
+      console.log('Uploaded:', result.downloadURL);
+    }
+  });
+<\/script>`,
+
+    progress: `<!-- Upload with progress bar -->
+<script src="https://studio-6794999112-ce5b1.web.app/dart-sdk.js"><\/script>
+
+<input type="file" id="f">
+<div style="background:#eee;height:4px;width:300px">
+  <div id="bar" style="height:100%;width:0%;background:#00ffc8;transition:width .1s"></div>
+</div>
+<div id="status">Ready</div>
+
+<script>
+  const dart = new DartSDK({ firebaseConfig: { /* your config */ } });
+
+  document.getElementById('f').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    await dart.upload(file, {
+      onProgress: (pct, speed) => {
+        document.getElementById('bar').style.width = pct + '%';
+        document.getElementById('status').textContent =
+          Math.round(pct) + '% \u2014 ' + speed.toFixed(0) + ' MB/s';
+      },
+      onComplete: result => {
+        document.getElementById('status').textContent = '\u2713 Done!';
+        console.log('URL:', result.downloadURL);
+      }
+    });
+  });
+<\/script>`,
+
+    full: `<!-- Full DART upload widget -->
+<script src="https://studio-6794999112-ce5b1.web.app/dart-sdk.js"><\/script>
+
+<div id="dart-widget"></div>
+
+<script>
+  const dart = new DartSDK({
+    firebaseConfig: {
+      apiKey:            "YOUR_API_KEY",
+      authDomain:        "YOUR_PROJECT.firebaseapp.com",
+      projectId:         "YOUR_PROJECT",
+      storageBucket:     "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId:             "YOUR_APP_ID",
+      databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com"
+    },
+    container:  '#dart-widget',
+    autoRender: true,
+    onComplete: (file, url) => console.log('Uploaded:', file.name, url),
+    onError:    (file, err) => console.error('Failed:', file.name, err.message),
+  });
+
+  dart.signIn();   // show Google sign-in
+<\/script>`,
+
+    publishLocker: `<!-- Upload to private locker -->
+<script src="https://studio-6794999112-ce5b1.web.app/dart-sdk.js"><\/script>
+
+<input type="file" id="myFile">
+<button onclick="uploadToLocker()">Upload to Locker</button>
+
+<script>
+  const dart = new DartSDK({ firebaseConfig: { /* your config */ } });
+
+  async function uploadToLocker() {
+    await dart.signIn(); // Google OAuth required
+    const file = document.getElementById('myFile').files[0];
+    if (!file) return;
+
+    const result = await dart.publish(file, {
+      publish: false, // false = private locker
+      onProgress: (pct, speed) => console.log(pct + '% @ ' + speed + ' MB/s')
+    });
+
+    console.log('Uploaded to locker:', result.downloadURL);
+  }
+<\/script>`,
+
+    publishPublic: `<!-- Publish to public area -->
+<script src="https://studio-6794999112-ce5b1.web.app/dart-sdk.js"><\/script>
+
+<input type="file" id="myFile">
+<button onclick="publishPublic()">Publish Publicly</button>
+
+<script>
+  const dart = new DartSDK({ firebaseConfig: { /* your config */ } });
+
+  async function publishPublic() {
+    await dart.signIn(); // Google OAuth required
+    const file = document.getElementById('myFile').files[0];
+    if (!file) return;
+
+    const result = await dart.publish(file, {
+      publish: true, // true = public area
+      onProgress: (pct, speed) => console.log(pct + '% @ ' + speed + ' MB/s')
+    });
+
+    console.log('Published publicly:', result.downloadURL);
+  }
+<\/script>`,
+  },
+
+  react: {
+    button: `import { useState } from 'react';
+import { DartSDK } from './dart-sdk';
+
+const dart = new DartSDK({ firebaseConfig: { /* your config */ } });
+
+export default function UploadButton() {
+  const [status, setStatus] = useState('idle');
+
+  async function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setStatus('uploading');
+    const result = await dart.upload(file, {
+      onProgress: (pct) => setStatus(\`\${Math.round(pct)}%\`),
+    });
+    setStatus('done');
+    console.log('URL:', result.downloadURL);
+  }
+
+  return (
+    <label>
+      <input type="file" onChange={handleFile} hidden />
+      <button>{status === 'idle' ? 'Upload with DART' : status}</button>
+    </label>
+  );
+}`,
+
+    dropzone: `import { useState, useCallback } from 'react';
+import { DartSDK } from './dart-sdk';
+
+const dart = new DartSDK({ firebaseConfig: { /* your config */ } });
+
+export default function DartDropZone() {
+  const [dragging, setDragging] = useState(false);
+  const [uploads,  setUploads]  = useState([]);
+
+  const onDrop = useCallback(async (e) => {
+    e.preventDefault(); setDragging(false);
+    for (const file of e.dataTransfer.files) {
+      setUploads(u => [...u, { name: file.name, pct: 0 }]);
+      await dart.upload(file, {
+        onProgress: (pct) =>
+          setUploads(u => u.map(x => x.name === file.name ? {...x, pct} : x)),
+      });
+    }
+  }, []);
+
+  return (
+    <div
+      onDragOver={e => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+      style={{ border: \`2px dashed \${dragging ? '#00ffc8' : '#444'}\`, padding: 40 }}
+    >
+      Drop files here
+      {uploads.map(u => (
+        <div key={u.name}>{u.name}: {Math.round(u.pct)}%</div>
+      ))}
+    </div>
+  );
+}`,
+
+    progress: `import { useState } from 'react';
+import { DartSDK } from './dart-sdk';
+
+const dart = new DartSDK({ firebaseConfig: { /* your config */ } });
+
+export default function DartUpload() {
+  const [pct,   setPct]   = useState(0);
+  const [speed, setSpeed] = useState(0);
+  const [url,   setUrl]   = useState(null);
+
+  async function upload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setPct(0); setUrl(null);
+    await dart.upload(file, {
+      onProgress: (p, s) => { setPct(p); setSpeed(s); },
+      onComplete: r => setUrl(r.downloadURL),
+    });
+  }
+
+  return (
+    <div>
+      <input type="file" onChange={upload} />
+      <div style={{ background: '#222', height: 4, width: '100%' }}>
+        <div style={{ width: pct + '%', height: '100%', background: '#00ffc8' }} />
+      </div>
+      <div>{Math.round(pct)}% @ {speed.toFixed(0)} MB/s</div>
+      {url && <a href={url}>Download</a>}
+    </div>
+  );
+}`,
+
+    full: `import { useEffect, useRef } from 'react';
+import { DartSDK } from './dart-sdk';
+
+export default function DartWidget({ onComplete }) {
+  const dart = useRef(null);
+
+  useEffect(() => {
+    dart.current = new DartSDK({
+      firebaseConfig: { /* your config */ },
+      container:  '#dart-root',
+      autoRender: true,
+      onComplete,
+    });
+    dart.current.signIn();
+    return () => dart.current?.destroy();
+  }, []);
+
+  return <div id="dart-root" />;
+}`,
+  },
+
+  vue: {
+    button: `<template>
+  <label>
+    <input type="file" @change="upload" hidden />
+    <button>{{ status }}</button>
+  </label>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import { DartSDK } from './dart-sdk';
+
+const dart   = new DartSDK({ firebaseConfig: { /* your config */ } });
+const status = ref('Upload with DART');
+
+async function upload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  await dart.upload(file, {
+    onProgress: pct => status.value = Math.round(pct) + '%',
+    onComplete: ()  => status.value = '\u2713 Done',
+  });
+}
+<\/script>`,
+
+    dropzone: `<template>
+  <div
+    @dragover.prevent="dragging = true"
+    @dragleave="dragging = false"
+    @drop.prevent="onDrop"
+    :class="{ active: dragging }"
+    class="dropzone"
+  >
+    <p>Drop files here</p>
+    <div v-for="u in uploads" :key="u.name">
+      {{ u.name }}: {{ Math.round(u.pct) }}%
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import { DartSDK } from './dart-sdk';
+
+const dart    = new DartSDK({ firebaseConfig: { /* your config */ } });
+const dragging = ref(false);
+const uploads  = ref([]);
+
+async function onDrop(e) {
+  dragging.value = false;
+  for (const file of e.dataTransfer.files) {
+    const entry = { name: file.name, pct: 0 };
+    uploads.value.push(entry);
+    await dart.upload(file, {
+      onProgress: pct => entry.pct = pct,
+    });
+  }
+}
+<\/script>`,
+
+    progress: `<template>
+  <input type="file" @change="upload" />
+  <div class="bar-track"><div class="bar-fill" :style="{ width: pct + '%' }"></div></div>
+  <p>{{ Math.round(pct) }}% @ {{ speed.toFixed(0) }} MB/s</p>
+  <a v-if="url" :href="url">Download</a>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import { DartSDK } from './dart-sdk';
+
+const dart  = new DartSDK({ firebaseConfig: { /* your config */ } });
+const pct   = ref(0);
+const speed = ref(0);
+const url   = ref('');
+
+async function upload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  pct.value = 0; url.value = '';
+  await dart.upload(file, {
+    onProgress: (p, s) => { pct.value = p; speed.value = s; },
+    onComplete: r => url.value = r.downloadURL,
+  });
+}
+<\/script>`,
+
+    full: `<template>
+  <div ref="root"></div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+import { DartSDK } from './dart-sdk';
+
+const root = ref(null);
+let dart;
+
+onMounted(() => {
+  dart = new DartSDK({
+    firebaseConfig: { /* your config */ },
+    container:  root.value,
+    autoRender: true,
+    onComplete: (file, url) => emit('uploaded', { file, url }),
+  });
+  dart.signIn();
+});
+onUnmounted(() => dart?.destroy());
+
+const emit = defineEmits(['uploaded']);
+<\/script>`,
+  },
+
+  svelte: {
+    button: `<script>
+  import { DartSDK } from './dart-sdk';
+
+  const dart = new DartSDK({ firebaseConfig: { /* your config */ } });
+  let status = 'Upload with DART';
+
+  async function upload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    await dart.upload(file, {
+      onProgress: pct => status = Math.round(pct) + '%',
+      onComplete: ()  => status = '\u2713 Done',
+    });
+  }
+<\/script>
+
+<label>
+  <input type="file" on:change={upload} hidden />
+  <button>{status}</button>
+</label>`,
+
+    dropzone: `<script>
+  import { DartSDK } from './dart-sdk';
+
+  const dart    = new DartSDK({ firebaseConfig: { /* your config */ } });
+  let dragging  = false;
+  let uploads   = [];
+
+  async function onDrop(e) {
+    e.preventDefault(); dragging = false;
+    for (const file of e.dataTransfer.files) {
+      let entry = { name: file.name, pct: 0 };
+      uploads = [...uploads, entry];
+      await dart.upload(file, {
+        onProgress: pct => {
+          entry.pct = pct * 100;
+          uploads = [...uploads];
+        },
+      });
+    }
+  }
+<\/script>
+
+<div
+  class:active={dragging}
+  on:dragover|preventDefault={() => dragging = true}
+  on:dragleave={() => dragging = false}
+  on:drop={onDrop}
+>
+  Drop files here
+  {#each uploads as u}
+    <div>{u.name}: {Math.round(u.pct)}%</div>
+  {/each}
+</div>`,
+
+    progress: `<script>
+  import { DartSDK } from './dart-sdk';
+  const dart = new DartSDK({ firebaseConfig: { /* your config */ } });
+  let pct = 0, speed = 0, url = '';
+
+  async function upload(e) {
+    const file = e.target.files[0]; if (!file) return;
+    pct = 0; url = '';
+    await dart.upload(file, {
+      onProgress: (p, s) => { pct = p; speed = s; },
+      onComplete: r => url = r.downloadURL,
+    });
+  }
+<\/script>
+
+<input type="file" on:change={upload} />
+<div style="background:#222;height:4px">
+  <div style="width:{pct}%;height:100%;background:#00ffc8"></div>
+</div>
+<p>{Math.round(pct)}% @ {speed.toFixed(0)} MB/s</p>
+{#if url}<a href={url}>Download</a>{/if}`,
+
+    full: `<script>
+  import { onMount, onDestroy } from 'svelte';
+  import { DartSDK } from './dart-sdk';
+
+  let container;
+  let dart;
+
+  onMount(() => {
+    dart = new DartSDK({
+      firebaseConfig: { /* your config */ },
+      container,
+      autoRender: true,
+      onComplete: (file, url) => dispatch('uploaded', { file, url }),
+    });
+    dart.signIn();
+  });
+  onDestroy(() => dart?.destroy());
+
+  import { createEventDispatcher } from 'svelte';
+  const dispatch = createEventDispatcher();
+<\/script>
+
+<div bind:this={container}></div>`,
+  },
+};
+</script>
+
+<script>
+// ── SDK docs ─────────────────────────────────────────────────────────────────
+const SDK_DOCS = {
+  upload: `// dart.upload(file, options) → Promise<{ downloadURL, filePath, deduped }>
+//
+// Uploads a single File to Firebase Storage.
+// Checks dedup first — if the file was uploaded before, returns immediately.
+// onProgress fires on every Firebase Storage progress event (~every 256KB).
+
+const result = await dart.upload(file, {
+  onProgress: (pct, speedMBps) => {
+    console.log(\`\${Math.round(pct)}% @ \${speedMBps.toFixed(0)} MB/s\`);
+  },
+  onComplete: ({ downloadURL, filePath, deduped }) => {
+    if (deduped) console.log('Already uploaded, skipped');
+    else         console.log('Uploaded to:', downloadURL);
+  },
+  onError: (err) => console.error('Upload failed:', err.message),
+});
+
+console.log(result.downloadURL);  // signed GCS URL, valid 7 days`,
+
+  uploadMultiple: `// dart.uploadMultiple(files, options) → Promise<Array<result>>
+//
+// Uploads multiple files concurrently.
+// onFileProgress fires per-file, onAllComplete fires when every file is done.
+
+const results = await dart.uploadMultiple(fileList, {
+  concurrency:    4,    // max parallel uploads (default 4)
+  onFileProgress: (file, pct, speed) => {
+    console.log(file.name, Math.round(pct) + '%');
+  },
+  onFileComplete: (file, result) => {
+    console.log(file.name, '->', result.downloadURL);
+  },
+  onAllComplete: (results) => {
+    console.log('All done:', results.length, 'files');
+  },
+});`,
+
+  onProgress: `// Attach a global progress listener (fires for all uploads)
+//
+// Useful for a single global progress bar across multiple uploads.
+
+dart.onProgress((file, pct, speedMBps) => {
+  console.log(file.name, Math.round(pct) + '%', speedMBps.toFixed(0) + ' MB/s');
+});
+
+// Remove the listener
+dart.offProgress();`,
+
+  onComplete: `// Attach a global completion listener
+//
+// Fires every time any upload finishes.
+
+dart.onComplete((file, result) => {
+  console.log('Completed:', file.name);
+  console.log('URL:', result.downloadURL);
+  console.log('Deduped (skipped):', result.deduped);
+
+  // Add to your UI
+  const link = document.createElement('a');
+  link.href = result.downloadURL;
+  link.textContent = file.name;
+  document.body.appendChild(link);
+});`,
+
+  history: `// dart.getHistory() → Promise<Array<transfer>>
+//
+// Returns the signed-in user's transfer history from Firestore.
+// Each entry: { id, name, size, filePath, downloadURL, status, ts }
+
+const history = await dart.getHistory({ limit: 50 });
+history.forEach(t => {
+  console.log(t.name, '->', t.downloadURL, '(' + t.status + ')');
+});
+
+// Or listen in real-time (fires whenever Firestore updates)
+const unsub = dart.listenHistory(transfers => {
+  console.log('History updated:', transfers.length, 'files');
+});
+
+// Stop listening
+unsub();`,
+
+  delete: `// dart.delete(filePath) → Promise<void>
+//
+// Deletes a file from Firebase Storage and its Firestore record.
+// filePath is the storagePath from the upload result (e.g. "uploads/uid/name.zip")
+
+await dart.delete(result.filePath);
+console.log('Deleted');
+
+// filePath comes from upload result or from listenHistory() entries`,
+
+  init: `// Full DartSDK initialization example
+
+import { DartSDK } from './dart-sdk.js';  // or use <script src="dart-sdk.js">
+
+const dart = new DartSDK({
+  // Required: your Firebase project config
+  firebaseConfig: {
+    apiKey:            "AIzaSy...",
+    authDomain:        "your-project.firebaseapp.com",
+    projectId:         "your-project",
+    storageBucket:     "your-project.appspot.com",
+    messagingSenderId: "123456789",
+    appId:             "1:123:web:abc",
+    databaseURL:       "https://your-project-default-rtdb.firebaseio.com",
+  },
+
+  // Optional callbacks
+  onComplete:  (file, result) => console.log('Done:', result.downloadURL),
+  onError:     (file, err)    => console.error('Error:', err.message),
+  onAuthChange:(user)         => console.log('User:', user?.email ?? 'signed out'),
+
+  // Optional: auto-render a full upload widget into a container
+  container:  '#my-upload-area',
+  autoRender: true,
+});
+
+// Sign in (opens Google popup or signs in anonymously)
+await dart.signIn();                // Google
+// Anonymous sign-in removed — Google sign-in required
+
+// Check if signed in
+console.log(dart.user);            // Firebase User object or null
+
+// Upload
+const result = await dart.upload(file);
+console.log(result.downloadURL);
+
+// Sign out
+await dart.signOut();`,
+};
+
+// ── REST API docs ────────────────────────────────────────────────────────────
+const API_ENDPOINTS = [
+  {
+    method: 'GET', path: '/dart/probe', desc: 'Connectivity check + server info',
+    params: [],
+    response: '{ ok, server, time, transport, backends, region }',
+    example: `const res = await fetch('/dart/probe', {
+  headers: { 'Authorization': 'Bearer ' + await user.getIdToken() }
+});
+const info = await res.json();
+console.log(info.server); // "DART v5.0 — Firebase Cloud Functions"`,
+  },
+  {
+    method: 'POST', path: '/dart/manifest', desc: 'Batch dedup check before uploading',
+    params: [
+      ['files', 'Array', 'Array of { name, size, hash } — hash is SHA-256 of file content'],
+    ],
+    response: '{ ok, needed: [{ name, size }], deduped: [{ name, hash, url }], ratio }',
+    example: `const res = await fetch('/dart/manifest', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + await user.getIdToken()
+  },
+  body: JSON.stringify({ files: [
+    { name: 'video.mp4', size: 1_500_000_000, hash: 'abc123...' }
+  ]})
+});
+const { needed, deduped, ratio } = await res.json();
+console.log('Dedup ratio:', Math.round(ratio * 100) + '%');`,
+  },
+  {
+    method: 'POST', path: '/dart/init', desc: 'Start or resume a chunked transfer session',
+    params: [
+      ['fileId',      'string', 'Unique ID for this file (e.g. SHA-256 of name+size)'],
+      ['name',        'string', 'Original filename'],
+      ['size',        'number', 'File size in bytes'],
+      ['totalChunks', 'number', 'Total number of chunks'],
+      ['chunkSize',   'number', 'Bytes per chunk (recommend 4MB)'],
+    ],
+    response: '{ ok, fileId, resume: [completedChunkIndexes] }',
+    example: `const res = await fetch('/dart/init', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + await user.getIdToken()
+  },
+  body: JSON.stringify({
+    fileId: 'my-file-id', name: 'video.mp4',
+    size: 1_500_000_000, totalChunks: 375, chunkSize: 4_000_000
+  })
+});
+const { resume } = await res.json();
+const completedSet = new Set(resume); // skip already-uploaded chunks`,
+  },
+  {
+    method: 'POST', path: '/dart/chunk/:fileId/:index', desc: 'Upload one chunk (raw binary body)',
+    params: [
+      [':fileId', 'string', 'File ID from /dart/init'],
+      [':index',  'number', 'Zero-based chunk index'],
+      ['body',    'binary', 'Raw chunk bytes (Content-Type: application/octet-stream)'],
+    ],
+    response: '{ ok, index }',
+    example: `const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB
+const token = await user.getIdToken();
+
+for (let i = 0; i < totalChunks; i++) {
+  const chunk = file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+  await fetch(\`/dart/chunk/\${fileId}/\${i}\`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Authorization': 'Bearer ' + token
+    },
+    body: chunk,
+  });
+}`,
+  },
+  {
+    method: 'POST', path: '/dart/finalize/:fileId', desc: 'Assemble chunks and push to Firebase Storage',
+    params: [
+      [':fileId',     'string', 'File ID from /dart/init'],
+      ['contentType', 'string', '(optional) MIME type, e.g. "video/mp4"'],
+    ],
+    response: '{ ok, downloadURL, storagePath, size, deduped }',
+    example: `const res = await fetch(\`/dart/finalize/\${fileId}\`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + await user.getIdToken()
+  },
+  body: JSON.stringify({ contentType: 'video/mp4' })
+});
+const { downloadURL } = await res.json();
+console.log('File available at:', downloadURL);`,
+  },
+  {
+    method: 'GET', path: '/dart/files', desc: "List the signed-in user's uploaded files",
+    params: [],
+    response: '{ ok, files: [{ id, name, size, downloadURL, status, ts }] }',
+    example: `const res = await fetch('/dart/files', {
+  headers: { 'Authorization': 'Bearer ' + await user.getIdToken() }
+});
+const { files } = await res.json();
+files.forEach(f => console.log(f.name, f.downloadURL));`,
+  },
+  {
+    method: 'POST', path: '/dart/direct-url', desc: 'Get a signed PUT URL — upload direct to GCS (bypass server)',
+    params: [
+      ['name',       'string', 'Filename'],
+      ['contentType', 'string', 'MIME type (e.g. "image/png")'],
+    ],
+    response: '{ url, filePath }',
+    example: `const res = await fetch('/dart/direct-url', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + await user.getIdToken()
+  },
+  body: JSON.stringify({ name: 'photo.png', contentType: 'image/png' })
+});
+const { url, filePath } = await res.json();
+// Use url to upload directly to GCS
+await fetch(url, { method: 'PUT', body: fileBlob });`,
+  },
+  {
+    method: 'POST', path: '/dart/publish', desc: 'Upload to locker or publish to public area',
+    params: [
+      ['name',        'string', 'Filename'],
+      ['downloadURL', 'string', 'Firebase Storage download URL'],
+      ['filePath',    'string', 'Storage path (e.g. "uploads/uid/file.ext")'],
+      ['fileSize',    'number', 'File size in bytes'],
+      ['publish',     'boolean', 'true = public area, false = private locker'],
+    ],
+    response: '{ success, fileId, published }',
+    example: `const res = await fetch('/dart/publish', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + await user.getIdToken()
+  },
+  body: JSON.stringify({
+    name: 'document.pdf',
+    downloadURL: 'https://storage.googleapis.com/...',
+    filePath: 'uploads/uid/document.pdf',
+    fileSize: 12345,
+    publish: true  // true = public, false = locker
+  })
+});
+const { success, fileId, published } = await res.json();`,
+  },
+];
+
+// Build a real config block + SDK URL from whatever the user filled in
+function _realConfig() {
+  const fc = window.FIREBASE_CONFIG || {};
+  const configured = window.FB_READY;
+  if (configured) {
+    return `{
+    apiKey:            "${fc.apiKey || ''}",
+    authDomain:        "${fc.authDomain || ''}",
+    projectId:         "${fc.projectId || ''}",
+    storageBucket:     "${fc.storageBucket || ''}",
+    messagingSenderId: "${fc.messagingSenderId || ''}",
+    appId:             "${fc.appId || ''}",
+    databaseURL:       "${fc.databaseURL || ''}",
+  }`;
+  }
+  return `{
+    apiKey:            "YOUR_API_KEY",
+    authDomain:        "your-project.firebaseapp.com",
+    projectId:         "your-project",
+    storageBucket:     "your-project.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId:             "YOUR_APP_ID",
+    databaseURL:       "https://your-project-default-rtdb.firebaseio.com",
+  }`;
+}
+
+function _sdkURL() {
+  return window.location.origin + '/dart-sdk.js';
+}
+
+function renderSnippet() {
+  const fw    = document.getElementById('snipFW')?.value   || 'vanilla';
+  const feat  = document.getElementById('snipFeat')?.value || 'button';
+  let   code  = SNIPPETS[fw]?.[feat] || '// Not available for this combination';
+  // Inject real values
+  code = code
+    .replace(/https:\/\/your-windsurf-site\.com\/dart-sdk\.js/g, _sdkURL())
+    .replace(/firebaseConfig: \{ \/\* paste your firebase config here \*\/ \}/g, `firebaseConfig: ${_realConfig()}`)
+    .replace(/firebaseConfig: \{ \/\* your config \*\/ \}/g, `firebaseConfig: ${_realConfig()}`)
+    .replace(/\/\* paste your firebase config here \*\//g, _realConfig())
+    .replace(/\/\* your config \*\//g, _realConfig())
+    .replace(/"YOUR_API_KEY"/g,            `"${(window.FIREBASE_CONFIG||{}).apiKey            || 'YOUR_API_KEY'}"`)
+    .replace(/"YOUR_PROJECT\.firebaseapp\.com"/g, `"${(window.FIREBASE_CONFIG||{}).authDomain  || 'YOUR_PROJECT.firebaseapp.com'}"`)
+    .replace(/"YOUR_PROJECT\.appspot\.com"/g,     `"${(window.FIREBASE_CONFIG||{}).storageBucket|| 'YOUR_PROJECT.appspot.com'}"`)
+    .replace(/"YOUR_PROJECT"/g,            `"${(window.FIREBASE_CONFIG||{}).projectId          || 'YOUR_PROJECT'}"`)
+    .replace(/"YOUR_SENDER_ID"/g,          `"${(window.FIREBASE_CONFIG||{}).messagingSenderId  || 'YOUR_SENDER_ID'}"`)
+    .replace(/"YOUR_APP_ID"/g,             `"${(window.FIREBASE_CONFIG||{}).appId              || 'YOUR_APP_ID'}"`);
+  const el = document.getElementById('snipCode');
+  if (el) el.textContent = code;
+}
+
+function renderSDK() {
+  const meth = document.getElementById('sdkMeth')?.value || 'upload';
+  let   code = SDK_DOCS[meth] || '// Method not found';
+  code = code
+    .replace(/\.\/dart-sdk\.js/g, _sdkURL())
+    .replace(/firebaseConfig: \{ \/\* your config \*\/ \}/g, `firebaseConfig: ${_realConfig()}`)
+    .replace(/\/\* your config \*\//g, _realConfig());
+  const el = document.getElementById('sdkCode');
+  if (el) el.textContent = code;
+}
+
+function renderAPIDocs() {
+  const el = document.getElementById('apiDocs');
+  if (!el) return;
+  el.innerHTML = API_ENDPOINTS.map((ep, i) => `
+    <div class="api-ep">
+      <div class="api-ep-hdr" onclick="toggleAPIEp(${i})">
+        <span class="api-method ${ep.method}">${ep.method}</span>
+        <span class="api-path">${ep.path}</span>
+        <span class="api-desc">${ep.desc}</span>
+      </div>
+      <div class="api-body" id="api-body-${i}">
+        ${ep.params.length ? `
+          <div class="api-sect">Parameters</div>
+          ${ep.params.map(([n,t,d]) => `
+            <div class="api-field">
+              <span class="api-fn">${n}</span>
+              <span class="api-type">${t}</span>
+              <span class="api-fdesc">${d}</span>
+            </div>`).join('')}
+        ` : ''}
+        <div class="api-sect">Response</div>
+        <div style="font-size:.48rem;color:var(--d);font-family:'DM Mono',monospace;padding:4px 0">${ep.response}</div>
+        <div class="api-sect">Example</div>
+        <div class="api-example">${ep.example.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+      </div>
+    </div>`).join('');
+}
+
+function toggleAPIEp(i) {
+  const body = document.getElementById('api-body-' + i);
+  if (body) body.classList.toggle('open');
+}
+</script>
+</body></html>

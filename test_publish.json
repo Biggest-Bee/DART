@@ -1,0 +1,7 @@
+{
+  "name": "test-file.txt",
+  "downloadURL": "https://storage.googleapis.com/test/test.txt",
+  "filePath": "uploads/test/test.txt",
+  "fileSize": 1234,
+  "publish": false
+}
