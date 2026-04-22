@@ -838,6 +838,23 @@ async function _hashId(file) {
   </div>
 </div>
 
+<!-- Sync modal -->
+<div class="modal-bg" id="syncModal" onclick="if(event.target===this)closeModal('syncModal')">
+  <div class="modal">
+    <div class="modal-title">🔄 Sync with local file</div>
+    <div class="modal-file" id="syncModalName"></div>
+    <div class="modal-label">Select local file to sync with</div>
+    <button class="btn btn-n btn-sm" onclick="selectLocalFileForSync()" style="width:100%;margin-bottom:10px">📁 Choose local file</button>
+    <div id="syncSelectedFile" style="margin-bottom:10px;font-size:.44rem;color:var(--mu)">No file selected</div>
+    <div class="modal-hint">Sync will keep the local file updated with changes from DART. If this is a public file and becomes private, sync will stop automatically.</div>
+    <div class="modal-err" id="syncErr"></div>
+    <div class="modal-row">
+      <button class="btn btn-n btn-sm" onclick="closeModal('syncModal')">Cancel</button>
+      <button class="btn btn-s btn-sm" id="syncBtn" onclick="startSync()" disabled>Start Sync</button>
+    </div>
+  </div>
+</div>
+
 <!-- Rename/retype modal -->
 <div class="modal-bg" id="renameModal" onclick="if(event.target===this)closeModal('renameModal')">
   <div class="modal">
@@ -1201,6 +1218,7 @@ function renderLockerGrid() {
         <button class="lk-btn sh" onclick="openShareModal('${fid}')">⟁</button>
         ${f.isPublic?`<button class="lk-btn" style="border-color:var(--d7);color:var(--d7)" onclick="openCollaborativeShare('${fid}')" title="Share for editing">👥</button>`:''}
         <button class="lk-btn" onclick="openCommentsModal('${fid}')">💬</button>
+        <button class="lk-btn" onclick="openSyncModal('${fid}')" title="Sync with local file">🔄</button>
         ${f.isPublic
           ?`<button class="lk-btn unpub" onclick="togglePublic('${fid}',false)">⊘</button>`
           :`<button class="lk-btn pub"   onclick="togglePublic('${fid}',true)">⊕</button>`}
@@ -1762,7 +1780,7 @@ async function unshareCollaborative(fileId, email) {
     } else {
       const {db,doc,getDoc,updateDoc} = window._dartFS;
       const snap = await getDoc(doc(db, 'public_files', fileId));
-      
+
       if (snap.exists()) {
         const data = snap.data();
         const sharedWith = (data.sharedWith || []).filter(e => e !== email);
@@ -1773,6 +1791,166 @@ async function unshareCollaborative(fileId, email) {
     loadCollaborativeShares(fileId);
   } catch(e) {
     _notify('Failed to unshare: ' + e.message, 'e');
+  }
+}
+
+// ── File Sync (New) ────────────────────────────────────────────────────────────────
+let _syncedFiles = new Map(); // fileId -> { fileHandle, unsub, isPublic }
+let _currentSyncFileId = null;
+let _selectedLocalFileHandle = null;
+
+async function openSyncModal(fileId) {
+  _currentSyncFileId = fileId;
+  const f = _lockerFiles.find(x=>x.id===fileId) || _pubFiles.find(x=>x.id===fileId);
+  if (!f) return;
+
+  document.getElementById('syncModalName').textContent = f.name || 'Unnamed file';
+  document.getElementById('syncSelectedFile').textContent = 'No file selected';
+  document.getElementById('syncErr').textContent = '';
+  document.getElementById('syncBtn').disabled = true;
+  _selectedLocalFileHandle = null;
+
+  openModal('syncModal');
+}
+
+async function selectLocalFileForSync() {
+  if (!('showOpenFilePicker' in window)) {
+    document.getElementById('syncErr').textContent = 'File System Access API not supported. Please use Chrome, Edge, or Opera.';
+    return;
+  }
+
+  try {
+    const [fileHandle] = await window.showOpenFilePicker({
+      types: [{
+        description: 'All files',
+        accept: { '*/*': ['.'] }
+      }]
+    });
+    _selectedLocalFileHandle = fileHandle;
+    const file = await fileHandle.getFile();
+    document.getElementById('syncSelectedFile').textContent = `Selected: ${file.name} (${fmtBytes(file.size)})`;
+    document.getElementById('syncBtn').disabled = false;
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      document.getElementById('syncErr').textContent = 'Failed to select file: ' + e.message;
+    }
+  }
+}
+
+async function startSync() {
+  if (!_currentSyncFileId || !_selectedLocalFileHandle) return;
+
+  const f = _lockerFiles.find(x=>x.id===_currentSyncFileId) || _pubFiles.find(x=>x.id===_currentSyncFileId);
+  if (!f) return;
+
+  try {
+    // Download the file to local location
+    const response = await fetch(f.downloadURL);
+    const blob = await response.blob();
+    const writable = await _selectedLocalFileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+
+    // Set up listener for file changes
+    const unsub = listenToFileChanges(_currentSyncFileId, _selectedLocalFileHandle);
+
+    // Track the sync
+    _syncedFiles.set(_currentSyncFileId, {
+      fileHandle: _selectedLocalFileHandle,
+      unsub,
+      isPublic: f.isPublic || false
+    });
+
+    closeModal('syncModal');
+    _notify(`Sync started for "${f.name}"`, 's');
+  } catch(e) {
+    document.getElementById('syncErr').textContent = 'Failed to start sync: ' + e.message;
+  }
+}
+
+function listenToFileChanges(fileId, fileHandle) {
+  const f = _lockerFiles.find(x=>x.id===fileId) || _pubFiles.find(x=>x.id===fileId);
+  if (!f) return () => {};
+
+  // Listen to Firestore changes for this file
+  const {db,doc,onSnapshot} = window._dartFS;
+  const collectionName = f.isPublic ? 'public_files' : 'transfers';
+  const docPath = f.isPublic ? doc(db, 'public_files', fileId) : doc(db, 'transfers', window._fbUser?.uid, 'files', fileId);
+
+  const unsub = onSnapshot(docPath, async (snap) => {
+    if (!snap.exists()) {
+      // File was deleted, stop sync
+      stopSync(fileId);
+      _notify('File was deleted, sync stopped', 'e');
+      return;
+    }
+
+    const data = snap.data();
+    const wasPublic = _syncedFiles.get(fileId)?.isPublic;
+    const isPublic = data.isPublic || false;
+
+    // Check if file went from public to private
+    if (wasPublic && !isPublic) {
+      stopSync(fileId);
+      _notify('File became private, sync stopped automatically', 'e');
+      return;
+    }
+
+    // Download updated file
+    if (data.downloadURL) {
+      try {
+        const response = await fetch(data.downloadURL);
+        const blob = await response.blob();
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        _notify('Local file updated from DART', 's');
+      } catch(e) {
+        console.error('Failed to update local file:', e);
+      }
+    }
+  }, (err) => {
+    console.error('Sync listener error:', err);
+  });
+
+  return unsub;
+}
+
+function stopSync(fileId) {
+  const sync = _syncedFiles.get(fileId);
+  if (sync) {
+    sync.unsub?.();
+    _syncedFiles.delete(fileId);
+  }
+}
+
+async function deletePublicFile(fileId) {
+  const f = _pubFiles.find(x=>x.id===fileId);
+  if (!f) return;
+  if (!confirm(`Delete "${f.fileName}"? This will also remove it from your locker if it exists. This cannot be undone.`)) return;
+
+  try {
+    // Stop any active sync
+    stopSync(fileId);
+
+    // Delete from public_files
+    const {db,doc,deleteDoc} = window._dartFS;
+    await deleteDoc(doc(db, 'public_files', fileId));
+
+    // Also delete from locker if it exists there
+    const lockerFile = _lockerFiles.find(x=>x.id===fileId);
+    if (lockerFile) {
+      await FB.delete(lockerFile.filePath, fileId);
+      _lockerFiles = _lockerFiles.filter(x=>x.id!==fileId);
+    }
+
+    // Remove from public files list
+    _pubFiles = _pubFiles.filter(x=>x.id!==fileId);
+
+    renderPublicGrid();
+    _notify('Deleted ' + f.fileName, 's');
+  } catch(e) {
+    _notify('Delete failed: ' + e.message, 'e');
   }
 }
 
@@ -2006,9 +2184,11 @@ function renderPublicGrid() {
         <button class="lk-btn dl" onclick="parallelDownload('${purl}','${pfname}',${f.fileSize||0});FB.logActivity?.('${pfid}','download')">↓ Download</button>
         <button class="lk-btn" onclick="navigator.clipboard.writeText('${purl}').then(()=>_notify('Copied','s'))">⎘</button>
         <button class="lk-btn" onclick="openCommentsModal_pub('${pfid}','${pfname}')">💬</button>
+        <button class="lk-btn" onclick="openSyncModal('${pfid}')" title="Sync with local file">🔄</button>
         ${isOwn?`<button class="lk-btn" style="border-color:var(--d4);color:var(--d4)" onclick="openEditPublishedModal('${pfid}')" title="Edit published file">✎ Edit</button>`:''}
         ${isOwn?`<button class="lk-btn" style="border-color:var(--d7);color:var(--d7)" onclick="openCollaborativeShare('${pfid}')" title="Share for editing">👥</button>`:''}
         ${isOwn?`<button class="lk-btn unpub" onclick="togglePublic('${pfid}',false)">⊘ Unpublish</button>`:''}
+        ${isOwn?`<button class="lk-btn del" onclick="deletePublicFile('${pfid}')" title="Delete file">✕</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -2535,7 +2715,7 @@ function updateRTDBPane(data) {
 // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
-    ['shareModal','renameModal','newFolderModal','moveModal','previewModal','commentsModal','zipModal','wsShareModal'].forEach(closeModal);
+    ['shareModal','renameModal','newFolderModal','moveModal','previewModal','commentsModal','zipModal','wsShareModal','syncModal'].forEach(closeModal);
   }
 });
 
